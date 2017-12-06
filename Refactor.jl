@@ -87,7 +87,6 @@ function update_plot(line, x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.
     #quiver4[:set_UVC](quiver_data4[:,1], quiver_data4[:,2])
 
     PyPlot.draw()
-    println(".")
     sleep(0.0001)
     #read(STDIN, 1)
 end
@@ -102,15 +101,17 @@ function main()
     # Parameters
     P = AdhCommon.Params(
              N, # number of points
-             10000, # max. number of iterations
+             100000, # max. number of iterations
 
              1/N, # space step
-             1e-4, # time step
+             1e-3, # time step
 
-             1e0, # pressure
+             3e-1, # pressure
              5e-2, # membrane elasticity
              1, # cortex viscosity
-             1e-4, # polymerization speed
+
+             2e-1, # polymerization speed
+
              16, # concentration of drag force in 1/(number of nodes)
 
              2*4.1, # initial ellipsis width
@@ -119,9 +120,9 @@ function main()
 
              # Confinement field
 
-             1e-1, # sharpness
+             5e0, # sharpness
              0.0, # depth
-             2, # pulsation
+             1, # pulsation
              1, # direction
              1, # number of Fourier components
              # to approximate a saw-tooth signal
@@ -129,9 +130,12 @@ function main()
              5.0 # inner width
             )
 
+    println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
+    println("critical pressure: ", 2*pi*P.K)
+
     # Flags
     F = AdhCommon.Flags(
-            true,  # confine
+            false,  # confine
             false, # adjust_drag
             false, # polymerize
             true,  # dryrun
@@ -160,6 +164,7 @@ function main()
     end
 
     k = 0
+    prev_height = 0.0
 
     # outer loop
     while k < P.M
@@ -179,7 +184,10 @@ function main()
             δx[:] = -(Jr_x\r_x)
             x[:] = x[:] + δx
         end
-        #println(res.zero)
+
+        height = sum(x[:,2]/P.N)
+        # println("Long. speed: ", (height - prev_height) / P.δt)
+        prev_height = height
 
         # plot
         if F.plot & (k % 10 == 0)
@@ -187,7 +195,6 @@ function main()
         end
 
         l2_norm = sqrt(sum(abs2, x))
-        println("||X||₂ = ", l2_norm)
 
         if l2_norm > 1e4
             println("Divergence detected, aborting")

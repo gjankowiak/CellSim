@@ -4,6 +4,30 @@ using AdhCommon
 
 export compute_field, compute_walls, check_OOB
 
+"""
+The wall is implemented using a penalization method
+The corresponding potential is computed as
+    f(x, y) = g(x, y) + g(-x, y)
+where
+    g(x, y) = k(f_width + f_β*pulse(y) - H(x))
+    H(x) = -h(x) * log(αx)
+and
+    pulse is a smooth oscillating function parameterized by
+    f_β::Float64      # depth
+    f_ω0::Float64     # pulsation
+    f_σ::Int          # direction
+    f_nk::Int         # number of Fourier components
+    (see AdhCommon.jl)
+
+with this notation,
+    H'(x) = -(h'(x) log(αx) + h(x)/x)
+    H''(x) = -(h''(x) log(αx) + 2h'(x)/x + h(x)/x^2)
+
+    h is chosen such that h(1/α) = h'(1/α) = h''(1/α) = 0
+
+    a possible such choice is h(x) = min(αx-1, 0)²
+"""
+
 macro pulse_init(x)
     return esc(quote
            const σω0 = params.f_σ*params.f_ω0
@@ -31,87 +55,46 @@ macro dpulse_step(x)
        end)
 end
 
+# return esc(:(2/pi*atan.($α*$x))) # atan
+# return esc(:(2*$α/pi./(1+($α*$x).^2))) # atan
+# return esc(:(-2*($α)^2*$x./(1+($α*$x).^2).^2))
+# return esc(:(tan.(pi/2*($y))/$α)) # atan
+
+function g(x::Vector{Float64}, α::Float64)
+    return -min.(α*x-1, 0.0).^2 .* log.(α*x)
+end
+
+function g_p(x::Vector{Float64}, α::Float64)
+    return -(2α*min.(α*x-1, 0.0).*log.(α*x) + min.(α*x-1, 0.0).^2./x)
+end
+
+function g_pp(x::Vector{Float64}, α::Float64)
+    return -(2α^2*(x.<(1/α)).*log.(α*x) + 4α*min.(α*x-1, 0.0)./x - min.(α*x-1, 0.0).^2/x.^2)
+end
+
 macro potential_thres()
-    return :(5e-3)
-end
-
-macro barrier_p()
-    return :(1)
-end
-
-function barrier_f(x)
-    return log.(x)
-end
-
-function barrier_fp(x)
-    return 1./x
-end
-
-function barrier_fpp(x)
-    return -1./x.^2
-end
-
-function barrier_full(x)
-    const p = @barrier_p
-    if p == 1
-        return barrier_f(x)
-    else
-        return barrier_f(x) .* abs.(barrier_f(x)).^(p-1)
-    end
-end
-
-function inv_barrier_full(x)
-    const p = @barrier_p
-    if p == 1
-        return exp(-x)
-    else
-        return exp(-x.^(1/p))
-    end
-end
-
-function barrier_full_p(x)
-    const p = @barrier_p
-    if p == 1
-        return barrier_fp(x)
-    else
-        f = barrier_f(x)
-        return p * barrier_fp(x) .* abs.(f).^(p-1)
-    end
-end
-
-function barrier_full_pp(x)
-    const p = @barrier_p
-    if p == 1
-        return barrier_fpp(x)
-    else
-        f = barrier_f(x)
-        return p * abs.(f).^(p - 2) .* (barrier_fpp(x) .* abs.(f) + (p-1)*sign(f).*barrier_fp(x).^2)
-    end
+    return :(1e-1)
 end
 
 function compute_walls(y::Vector, params::Params, levelset::Float64=0.0)
     N = size(y)
     @pulse_init(y)
-    threshold_f = @potential_thres
-    width_active_wall = 3e-2*params.f_width
-    α = -threshold_f/barrier_full([width_active_wall])[1]
     α = params.f_α
     for i = 2:Int(params.f_nk)
         @pulse_step(y)
     end
     if levelset == 0.0
-        return params.f_β*pulse + params.f_width
+        return -params.f_β*pulse - params.f_width
     else
-        return inv_barrier_full(threshold_f./α)-params.f_β*pulse - params.f_width
+        return -params.f_β*pulse - params.f_width + 1/α
     end
 end
 
 function compute_field(x::Matrix, params::Params; gradient::Bool=true, hessian::Bool=true)
     local N = params.N
-    threshold_f = @potential_thres
-    width_active_wall = 3e-2*params.f_width
-    α = -threshold_f/barrier_full(width_active_wall)
+    prefac = 1e1
     α = params.f_α
+    β = params.f_β
     if α == 0
         return zeros(N), zeros(N, 2), spzeros(2N, 2N)
     end
@@ -121,25 +104,23 @@ function compute_field(x::Matrix, params::Params; gradient::Bool=true, hessian::
         @pulse_step(x[:,2])
         @dpulse_step(x[:,2])
     end
-    x_left  = max.(1e-25, params.f_width + params.f_β*pulse + x[:,1])
-    x_right = max.(1e-25, params.f_width + params.f_β*pulse - x[:,1])
-    f_left  = -α*barrier_full(x_left)
-    f_right = -α*barrier_full(x_right)
-    local f = f_left + f_right
-
-    trim_mask = (f_left .> -α*barrier_full(width_active_wall)) .| (f_right .> -α*barrier_full(width_active_wall))
+    x_right  = max.(1e-25, + params.f_width + β*pulse - x[:,1])
+    x_left = max.(1e-25, + params.f_width + β*pulse + x[:,1])
+    f_right  = g(x_right, α)
+    f_left = g(x_left, α)
+    local f = f_right + f_left
 
     if gradient
-        ∇f = -α*trim_mask.*[barrier_full_p(x_left)-barrier_full_p(x_right) params.f_β*dpulse.*(barrier_full_p(x_left)+barrier_full_p(x_right))]
+        ∇f = [g_p(x_left, α)-g_p(x_right, α) β*dpulse.*(g_p(x_right, α)+g_p(x_left, α))]
         if hessian
-            DN = params.f_β*dpulse.*trim_mask.*(barrier_full_pp(x_left)-barrier_full_pp(x_right))
-            D0 = [trim_mask.*(barrier_full_pp(x_left)+barrier_full_pp(x_right)) trim_mask.*(params.f_β*d2pulse.*(barrier_full_p(x_left)+barrier_full_p(x_right))+params.f_β^2*dpulse.^2.*(barrier_full_pp(x_left)+barrier_full_pp(x_right)))]
-            H = -α*spdiagm((DN, D0, DN), (-N, 0, N), 2N, 2N)
+            DN = β*dpulse.*(g_pp(x_left)-g_pp(x_right))
+            D0 = [g_pp(x_right, α)+g_pp(x_left, α) (β*d2pulse.*(g_p(x_right, α)+g_p(x_left, α))+β^2*dpulse.^2.*(g_pp(x_right, α)+g_pp(x_left, α)))]
+            H = spdiagm((DN, D0, DN), (-N, 0, N), 2N, 2N)
             return f, ∇f, H
         end
-        return f, ∇f, spzeros(2N, 2N)
+        return prefac*f, prefac*∇f, prefac*spzeros(2N, 2N)
     end
-    return f, Matrix(0, 0), spzeros(2N, 2N)
+    return prefac*f, Matrix(0, 0), spzeros(2N, 2N)
 end
 
 function check_OOB(x::Matrix, params::Dict{String,Float64})
@@ -148,9 +129,9 @@ function check_OOB(x::Matrix, params::Dict{String,Float64})
     for i = 2_Int(params.f_nk)
         @pulse_step(x[:,2])
     end
-    x_left  = params.f_width + params.f_β*pulse + x[:,1]
-    x_right = params.f_width + params.f_β*pulse - x[:,1]
-    return (x_left .< 1e-15) | (x_right .< 1e-15)
+    x_right  = - params.f_width - params.f_β*pulse + x[:,1]
+    x_left = - params.f_width - params.f_β*pulse - x[:,1]
+    return (x_right .< 1e-15) | (x_left .< 1e-15)
 end
 
 

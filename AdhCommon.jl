@@ -54,22 +54,6 @@ immutable Flags
     innerloop::Bool
 end
 
-#@inbounds function shift!(src::Matrix, dst::Matrix)
-@inbounds function shift!(src::Array, dst::Array)
-    last = src[end,:]
-    dst[2:end,:] = src[1:end-1,:]
-    dst[1,:] = last
-    return dst
-end
-
-#@inbounds function ishift!(src::Matrix, dst::Matrix, offset::Int=1)
-@inbounds function ishift!(src::Array, dst::Array, offset::Int=1)
-    first = src[1:offset,:]
-    dst[1:end-offset,:] = src[1+offset:end,:]
-    dst[end+1-offset:end,:] = first
-    return dst
-end
-
 macro looped(array, i_min, i_max)
     return :( $array[mod((($i_min)-1):(($i_max)-1), size($array, 1))+1] )
 end
@@ -79,7 +63,7 @@ macro delta(x)
 end
 
 macro delta!(src, dst)
-    return esc(:($dst[:] = AdhCommon.ishift!($src, $dst) - $src))
+    return esc(:($dst[:] = circshift!($dst, $src, -1) - $src))
 end
 
 macro entry_norm(x)
@@ -108,6 +92,20 @@ end
 
 macro repdiagblk(M, n)
     return :( blkdiag(ntuple((_) -> $M, $n)...) )
+end
+
+@inbounds function shift!(src::Array{Float64}, dst::Array{Float64})
+    last = src[end,:]
+    dst[2:end,:] = src[1:end-1,:]
+    dst[1,:] = last
+    return dst
+end
+
+@inbounds function ishift!(src::Array{Float64}, dst::Array{Float64}, offset::Int=1)
+    first = src[1:offset,:]
+    dst[1:end-offset,:] = src[1+offset:end,:]
+    dst[end+1-offset:end,:] = first
+    return dst
 end
 
 function perp!(src::Matrix, dst::Matrix)

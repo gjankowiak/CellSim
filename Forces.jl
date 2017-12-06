@@ -2,7 +2,7 @@ module Forces
 
 using AdhCommon
 import Wall, Masks
-import Utils: spdiagm_const
+import Utils: spdiagm_const, idxmod
 
 immutable PointCoords
     x::Matrix{Float64}
@@ -254,8 +254,6 @@ function compute_confinement_force(coords::PointCoords,
                                    dst_f::Vector{Float64},
                                    add::Bool=false)
     field, ∇field, H_field = Wall.compute_field(coords.x, P; gradient=true, hessian=false)
-    println("max confinement strength:")
-    println(maximum(sum(abs2, ∇field, 2)))
     if add
         copy!(dst_f, dst_f + vec(-∇field))
     else
@@ -275,36 +273,128 @@ function compute_confinement_force(coords::PointCoords,
     end
 end
 
-function compute_drag_force(coords::PointCoords, coords_s::PointCoordsShifted,
-                            P::Params, F::Flags,
-                            dst::Vector{Float64}, add::Bool=false)
-    x_min, x_min_idx = findmin(view(coords.x,:,2))
-    x_max, x_max_idx = findmax(view(coords.x,:,2))
+function compute_density_increment(coords::PointCoords, coords_s::PointCoordsShifted,
+                                   P::Params, F::Flags)
+    """
+    de/polymerization is located around the back/frontmost points, with a weight of (a, 1-2a, a)
+    the total flux J = ∫(f)+ dl is fixed by the polymerization speed
+    """
+    a = 0.25
 
-    drag_mask = Masks.compute_drag_mask(x_prev, coords.ΔL, P.f_iwidth/2, 6.0)
-    if F.polymerize && !flags.initializing
-        mask = 1-drag_mask/maximum(drag_mask)
-        if F.continuous
-            drag_vec = coords.x[x_min_idx,:] - coords.x[x_max_idx,:]
-        end
-        if add
-            dst += (!P.polymerize) * params.c * drag_mask .* repmat(reshape(drag_vec, 1, 2), params.N, 1)
+    x_min, x_min_idx = findmin(coords.x[:,2])
+    x_max, x_max_idx = findmax(coords.x[:,2])
+
+    # computation of the density increment
+    ΔLc = 0.5*(coords.ΔL + coords_s.ΔL_m)
+
+    front_norm = (1-2*a)*ΔLc[x_max_idx] + a*(ΔLc[idxmod(x_max_idx-1, P.N)] + ΔLc[idxmod(x_max_idx+1, P.N)])
+    back_norm = (1-2*a)*ΔLc[x_min_idx] + a*(ΔLc[idxmod(x_min_idx-1, P.N)] + ΔLc[idxmod(x_min_idx+1, P.N)])
+
+    f = zeros(P.N)
+
+    # front section
+    f[x_max_idx] = (1-2*a)*P.c/front_norm
+    f[idxmod(x_max_idx-1, P.N)] = a*P.c/front_norm
+    f[idxmod(x_max_idx+1, P.N)] = a*P.c/front_norm
+
+    # back section
+    f[x_min_idx] = -(1-2*a)*P.c/back_norm
+    f[idxmod(x_min_idx-1, P.N)] = -a*P.c/back_norm
+    f[idxmod(x_min_idx+1, P.N)] = -a*P.c/back_norm
+
+    return f
+end
+
+function integrate(f::Array{Float64}, P::Params)
+    return P.Δσ*sum(f, 1)
+end
+
+function cumsum_zero(f::Array{Float64})
+    z = zeros(f)
+    cumsum!(z, f, 1)
+    z = 0.5z + 0.5circshift(z, 1)
+    return z
+end
+
+function split_cumsum(a::Array{Float64,1}, idx)
+    b = zeros(a)
+    N = length(a)
+    b[idx+1:end]  = cumsum(a[idx:end-1])
+    b[idx-1:-1:1] = cumsum(a[idx-1:-1:1])
+
+    m = 1
+    p = N
+
+    while abs(b[m] - b[p]) > a[p]
+        if b[m] < b[p]
+            b[p] = b[m] + a[p]
+            m = idxmod(m+1, N)
+            p = idxmod(p+1, N)
         else
-            dst[:] = (!P.polymerize) * params.c * drag_mask .* repmat(reshape(drag_vec, 1, 2), params.N, 1)
+            b[m] = b[p] + a[p]
+            m = idxmod(m-1, N)
+            p = idxmod(p-1, N)
         end
     end
 
+    return b
+end
+
+function compute_drag_mask(coords::PointCoords, half_w::Float64, pow::Float64=2.0)
+    x_min, x_min_idx = findmin(coords.x[:,2])
+    x_max, x_max_idx = findmax(coords.x[:,2])
+
+    dst_from_min = split_cumsum(coords.ΔL, x_min_idx)
+    dst_from_max = split_cumsum(coords.ΔL, x_max_idx)
+
+    profile_min = exp.(-(dst_from_min/half_w).^pow)
+    profile_min .*= profile_min .> 1e-5
+    profile_min .*= 0.5/sum(profile_min)
+    profile_max = exp.(-(dst_from_max/half_w).^pow)
+    profile_max .*= profile_max .> 1e-5
+    profile_max .*= 0.5/sum(profile_max)
+
+    return profile_min + profile_max
 end
 
 function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
                                  P::Params, F::Flags,
-                                 dst::Vector{Float64})
-    if x_max_idx < x_min_idx
-        Ftransport = 0.5p_freq * (-(x_max_idx .< 1:N .< x_min_idx) .* Δx_m
-                                  + ((1:N .< x_max_idx) | (x_min_idx .< 1:N)) .* Δx)
+                                 dst_f::Vector{Float64},
+                                 add::Bool=false)
+
+    f = compute_density_increment(coords, coords_s, P, F)
+
+    # computation of the transport term
+    cum_added_mass = 0.5 * cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
+
+    transport_force = -vec((-0.5*P.c + cum_added_mass) .* coords.Δ2x/2P.Δσ)
+
+    drag_mask = compute_drag_mask(coords, 1.0)
+    drag_force = -vec(0.5drag_mask.*sum(f.*(coords.ΔL + coords_s.ΔL_m).*coords.x, 1))/P.Δσ
+
+    if add
+        copy!(dst_f, dst_f + transport_force + drag_force)
     else
-        Ftransport = -0.5p_freq * (-(x_min_idx .< 1:N .< x_max_idx) .* Δx
-                                   + ((1:N .< x_min_idx) | (x_max_idx .< 1:N)) .* Δx_m)
+        copy!(dst_f, transport_force + drag_force)
+    end
+end
+
+function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
+                                 P::Params, F::Flags,
+                                 diffs::Differentials,
+                                 dst_Df::SparseMatrixCSC{Float64},
+                                 add::Bool=false)
+    f = compute_density_increment(coords, coords_s, P, F)
+
+    # computation of the transport term
+    cum_added_mass = 0.5 * cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
+
+    D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1c
+
+    if add
+        dst_Df[:] = dst_Df + D_transport_force
+    else
+        dst_Df[:] = D_transport_force
     end
 end
 
@@ -322,13 +412,6 @@ function compute_viscosity_force(coords::PointCoords, coords_s::PointCoordsShift
     # dst_Df[:] =
 end
 
-
-
-# f!(x::Vector{Float64}, fx::Vector{Float64})
-# g!(x::Vector{Float64}, gx::SparseMatrixCSC{Float64})
-# df = DifferentiableSparseMultivariateFunction(f!, g!)
-# nlsolve(df, initial_x)
-
 function compute_residuals(x::Vector{Float64},
                            coords::PointCoords, coords_s::PointCoordsShifted,
                            inner_coords::PointCoords, inner_coords_s::PointCoordsShifted,
@@ -342,9 +425,11 @@ function compute_residuals(x::Vector{Float64},
 
     compute_pressure_force(inner_coords, P, dst, true)
     compute_elastic_force(inner_coords, inner_coords_s, P, differentials, dst, true)
-    compute_confinement_force(inner_coords, P, dst, true)
-    #compute_drag_force(inner_coords, inner_coords_s, P, F, dst, true)
-    #compute_transport_force(inner_coords, inner_coords_s, P, F, dst, true)
+    if F.confine
+        compute_confinement_force(inner_coords, P, dst, true)
+    end
+    # compute_drag_force(inner_coords, inner_coords_s, P, F, dst, true)
+    compute_transport_force(inner_coords, inner_coords_s, P, F, dst, true)
 
     if F.innerloop
         dst[:] = vec(x) - vec(coords.x) - P.δt*dst
@@ -370,7 +455,10 @@ function compute_residuals_J(x::Vector{Float64},
     end
     compute_pressure_force(inner_coords, P, dst_Df, true)
     compute_elastic_force(inner_coords, inner_coords_s, P, differentials, dst_Df, true)
-    compute_confinement_force(inner_coords, P, dst_Df, true)
+    if F.confine
+        compute_confinement_force(inner_coords, P, dst_Df, true)
+    end
+    compute_transport_force(inner_coords, inner_coords_s, P, F, differentials, dst_Df, true)
 
     dst_Df[:] = speye(2P.N) - P.δt*dst_Df
 end
