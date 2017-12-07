@@ -69,7 +69,7 @@ function g_p(x::Vector{Float64}, α::Float64)
 end
 
 function g_pp(x::Vector{Float64}, α::Float64)
-    return -(2α^2*(x.<(1/α)).*log.(α*x) + 4α*min.(α*x-1, 0.0)./x - min.(α*x-1, 0.0).^2/x.^2)
+    return -(2α^2*(x.<(1/α)).*log.(α*x) + 4α*min.(α*x-1, 0.0)./x - min.(α*x-1, 0.0).^2./x.^2)
 end
 
 macro potential_thres()
@@ -113,7 +113,7 @@ function compute_field(x::Matrix, params::Params; gradient::Bool=true, hessian::
     if gradient
         ∇f = [g_p(x_left, α)-g_p(x_right, α) β*dpulse.*(g_p(x_right, α)+g_p(x_left, α))]
         if hessian
-            DN = β*dpulse.*(g_pp(x_left)-g_pp(x_right))
+            DN = β*dpulse.*(g_pp(x_left, α)-g_pp(x_right, α))
             D0 = [g_pp(x_right, α)+g_pp(x_left, α) (β*d2pulse.*(g_p(x_right, α)+g_p(x_left, α))+β^2*dpulse.^2.*(g_pp(x_right, α)+g_pp(x_left, α)))]
             H = spdiagm((DN, D0, DN), (-N, 0, N), 2N, 2N)
             return f, ∇f, H

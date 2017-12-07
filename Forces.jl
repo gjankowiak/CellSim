@@ -284,7 +284,7 @@ function compute_confinement_force(coords::PointCoords,
                                    P::Params,
                                    dst_Df::SparseMatrixCSC{Float64},
                                    add::Bool=false)
-    field, ∇field, H_field = Wall.compute_field(coords.x, P; gradient=false, hessian=true)
+    field, ∇field, H_field = Wall.compute_field(coords.x, P; gradient=true, hessian=true)
     if add
         dst_Df[:] = dst_Df - H_field
     else
