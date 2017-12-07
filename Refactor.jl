@@ -5,7 +5,7 @@ import Forces
 import Wall
 import Masks
 import Utils
-#import Surface
+# import Surface
 import SurfacesCommon
 import EvenParam
 
@@ -21,7 +21,7 @@ function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
     ax[:set_aspect]("equal", "datalim")
 
     line = ax[:plot](x[:,1], x[:,2], ".-", zorder=1)[1]
-    #tracker = ax[:scatter](x[tr_idx,1], x[tr_idx,2], color="black", zorder=2)
+    tracker = ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
     ax[:plot](x[:,1], x[:,2], color="black", lw=0.5)[1] # initial condition
 
     y = collect(linspace(-40, 40, 1000))
@@ -34,28 +34,30 @@ function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
 
     ax[:axvline](0)
 
-    #quiver1 = ax[:quiver](x[:,1], x[:,2], quiver_data1[:,1], quiver_data1[:,2], units="x", width=0.001, color="blue")
-    #quiver2 = ax[:quiver](x[:,1], x[:,2], quiver_data2[:,1], quiver_data2[:,2], scale_units="x", width=0.001, color="blue")
-    #quiver3 = ax[:quiver](x[:,1], x[:,2], quiver_data3[:,1], quiver_data3[:,2], units="x", width=0.001, color="blue")
-    #quiver4 = ax[:quiver](x[:,1], x[:,2], quiver_data4[:,1], quiver_data4[:,2], units="x", width=0.001, color="blue")
+    # quiver1 = ax[:quiver](x[:,1], x[:,2], quiver_data1[:,1], quiver_data1[:,2], units="x", width=0.001, color="blue")
+    # quiver2 = ax[:quiver](x[:,1], x[:,2], quiver_data2[:,1], quiver_data2[:,2], scale_units="x", width=0.001, color="blue")
+    # quiver3 = ax[:quiver](x[:,1], x[:,2], quiver_data3[:,1], quiver_data3[:,2], units="x", width=0.001, color="blue")
+    # quiver4 = ax[:quiver](x[:,1], x[:,2], quiver_data4[:,1], quiver_data4[:,2], units="x", width=0.001, color="blue")
 
-    #figManager = PyPlot.get_current_fig_manager()
-    #figManager[:window][:showMaximized]()
+    # figManager = PyPlot.get_current_fig_manager()
+    # figManager[:window][:showMaximized]()
     PyPlot.show()
 
     fig[:tight_layout]()
     return line
 end
 
-function update_plot(line, x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags, initializing::Bool)
-    ax = line[:axes]
-    line[:set_data](x[:,1], x[:,2])
-    #tracker[:set_data](x[tr_idx,1], x[tr_idx,2])
+function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags, initializing::Bool, plotables::Forces.Plotables)
+    ax = PyPlot.gca()
+    lines = ax[:lines]
+    scatters = ax[:collections]
+    lines[1][:set_data](x[:,1], x[:,2])
+    # tracker[:set_data](x[tr_idx,1], x[tr_idx,2])
 
-    #line_dbg[:set_data](1:N, x[:,1]-x0[:,1])
+    # line_dbg[:set_data](1:N, x[:,1]-x0[:,1])
 
     # effective angle force
-    #FA = @entry_norm(reshape(M_DFangle * δx, N, 2))/δt
+    # FA = @entry_norm(reshape(M_DFangle * δx, N, 2))/δt
 
     if initializing
         prefix = "[INIT]"
@@ -65,30 +67,28 @@ function update_plot(line, x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.
     ax[:set_title](@sprintf("%s N: %d, iter: %d", prefix, P.N, k))
 
     # effective angle force
-    #FA = @entry_norm(reshape(M_DFangle * δx, N, 2))/δt
+    # FA = @entry_norm(reshape(M_DFangle * δx, N, 2))/δt
 
-    #tracker[:set_offsets](x[tr_idx,:])
-    #tracker[:set_sizes](3e3*FA[tr_idx])
-    #tracker[:set_sizes](40*(drag_mask[tr_idx]/maximum(drag_mask)))
-    #tracker[:set_sizes](tracker_data)
-    #tracker[:set_facecolors](map(x-> x>1-1e-10 ? "#00FF00" : "#FF0000", drag_mask[tr_idx]))
-    #tracker[:set_facecolors](map(x-> x>1-1e-10 ? "#00FF00" : "#FF0000", mask[tr_idx]))
+    scatters[1][:set_offsets](x[:,:])
+    scatters[1][:set_sizes](AdhCommon.@entry_norm(plotables.drag_force))
+    # tracker[:set_facecolors](map(x-> x>1-1e-10 ? "#00FF00" : "#FF0000", drag_mask[tr_idx]))
+    # tracker[:set_facecolors](map(x-> x>1-1e-10 ? "#00FF00" : "#FF0000", mask[tr_idx]))
 
-    #quiver1[:set_offsets](x)
-    #quiver1[:set_UVC](quiver_data1[:,1], quiver_data1[:,2])
+    # quiver1[:set_offsets](x)
+    # quiver1[:set_UVC](quiver_data1[:,1], quiver_data1[:,2])
 
-    #quiver2[:set_offsets](x)
-    #quiver2[:set_UVC](quiver_data2[:,1], quiver_data2[:,2])
+    # quiver2[:set_offsets](x)
+    # quiver2[:set_UVC](quiver_data2[:,1], quiver_data2[:,2])
 
-    #quiver3[:set_offsets](x)
-    #quiver3[:set_UVC](quiver_data3[:,1], quiver_data3[:,2])
+    # quiver3[:set_offsets](x)
+    # quiver3[:set_UVC](quiver_data3[:,1], quiver_data3[:,2])
 
-    #quiver4[:set_offsets](x)
-    #quiver4[:set_UVC](quiver_data4[:,1], quiver_data4[:,2])
+    # quiver4[:set_offsets](x)
+    # quiver4[:set_UVC](quiver_data4[:,1], quiver_data4[:,2])
 
     PyPlot.draw()
     sleep(0.0001)
-    #read(STDIN, 1)
+    # read(STDIN, 1)
 end
 
 function main()
@@ -145,6 +145,8 @@ function main()
             false, # innerloop
            )
 
+    plotables = Forces.new_plotables(N)
+
     t = linspace(0, 1, N+1)[1:N]
 
     x_init = 0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)]
@@ -154,7 +156,7 @@ function main()
     Forces.init_FD_matrices(P)
     coords, coords_s = Forces.new_PointCoords(x, P)
 
-    resi, resi_J = Forces.wrap_residuals(coords, coords_s, P, F)
+    resi, resi_J = Forces.wrap_residuals(coords, coords_s, P, F, plotables)
     if F.innerloop
         resi_solver = NLsolve.DifferentiableSparseMultivariateFunction(resi, resi_J)
     else
@@ -185,13 +187,14 @@ function main()
             x[:] = x[:] + δx
         end
 
-        height = sum(x[:,2]/P.N)
-        # println("Long. speed: ", (height - prev_height) / P.δt)
-        prev_height = height
 
         # plot
         if F.plot & (k % 10 == 0)
-            update_plot(line, x, k, P, F, false)
+            update_plot(x, k, P, F, false, plotables)
+            height = sum(x[:,2]/P.N)
+            long_speed = (height - prev_height) / 10P.δt
+            prev_height = height
+            println("Long. speed: ", long_speed)
         end
 
         l2_norm = sqrt(sum(abs2, x))

@@ -4,7 +4,7 @@ using AdhCommon
 import Wall, Masks
 import Utils: spdiagm_const, idxmod
 
-immutable PointCoords
+struct PointCoords
     x::Matrix{Float64}
     Δx::Matrix{Float64}
     Δ2x::Matrix{Float64}
@@ -41,7 +41,8 @@ immutable PointCoords
     d2vd2τ::Vector{Float64}
 end
 
-immutable PointCoordsShifted
+
+struct PointCoordsShifted
     Δx_m::SubArray
     Δx_p::SubArray
     ΔL_m::SubArray
@@ -52,7 +53,14 @@ immutable PointCoordsShifted
     v_p::SubArray
 end
 
-type Differentials
+struct Plotables
+    field::Vector{Float64}
+    ∇field::Matrix{Float64}
+    transport_force::Matrix{Float64}
+    drag_force::Matrix{Float64}
+end
+
+mutable struct Differentials
     Dτ::SparseMatrixCSC{Float64}
     Dτc::SparseMatrixCSC{Float64}
     Dv::SparseMatrixCSC{Float64}
@@ -155,6 +163,15 @@ function update_coords(coords::PointCoords, P::Params, x::Matrix{Float64})
     coords.d2vd2τ[:] = D2_short*coords.vd2τ
 end
 
+function new_plotables(N::Int64)
+    return Plotables(
+        zeros(N),  # field
+        zeros(N,2), # ∇field
+        zeros(N,2), # transport_force
+        zeros(N,2), # drag_force
+       )
+end
+
 function init_FD_matrices(P::Params)
     N = P.N
     Δσ = P.Δσ
@@ -250,7 +267,7 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
 end
 
 function compute_confinement_force(coords::PointCoords,
-                                   P::Params,
+                                   P::Params, plotables::Plotables,
                                    dst_f::Vector{Float64},
                                    add::Bool=false)
     field, ∇field, H_field = Wall.compute_field(coords.x, P; gradient=true, hessian=false)
@@ -259,6 +276,8 @@ function compute_confinement_force(coords::PointCoords,
     else
         copy!(dst,  vec(-∇field))
     end
+    plotables.field[:] = field
+    plotables.∇field[:] = ∇field
 end
 
 function compute_confinement_force(coords::PointCoords,
@@ -358,7 +377,7 @@ function compute_drag_mask(coords::PointCoords, half_w::Float64, pow::Float64=2.
 end
 
 function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
-                                 P::Params, F::Flags,
+                                 P::Params, F::Flags, plotables::Plotables,
                                  dst_f::Vector{Float64},
                                  add::Bool=false)
 
@@ -367,15 +386,15 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
     # computation of the transport term
     cum_added_mass = 0.5 * cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
 
-    transport_force = -vec((-0.5*P.c + cum_added_mass) .* coords.Δ2x/2P.Δσ)
+    plotables.transport_force[:] = -(-0.5*P.c + cum_added_mass) .* coords.Δ2x/2P.Δσ
 
-    drag_mask = compute_drag_mask(coords, 1.0)
-    drag_force = -vec(0.5drag_mask.*sum(f.*(coords.ΔL + coords_s.ΔL_m).*coords.x, 1))/P.Δσ
+    drag_mask = compute_drag_mask(coords, 5.0, 4.0)
+    plotables.drag_force[:] = -(0.5drag_mask.*sum(f.*(coords.ΔL + coords_s.ΔL_m).*coords.x, 1))/P.Δσ
 
     if add
-        copy!(dst_f, dst_f + transport_force + drag_force)
+        copy!(dst_f, dst_f + vec(plotables.transport_force + plotables.drag_force))
     else
-        copy!(dst_f, transport_force + drag_force)
+        copy!(dst_f, vec(plotables.transport_force + plotables.drag_force))
     end
 end
 
@@ -415,7 +434,7 @@ end
 function compute_residuals(x::Vector{Float64},
                            coords::PointCoords, coords_s::PointCoordsShifted,
                            inner_coords::PointCoords, inner_coords_s::PointCoordsShifted,
-                           P::Params, F::Flags,
+                           P::Params, F::Flags, plotables::Plotables,
                            dst::Vector{Float64})
 
     update_coords(inner_coords, P, reshape(x, (P.N, 2)))
@@ -426,10 +445,9 @@ function compute_residuals(x::Vector{Float64},
     compute_pressure_force(inner_coords, P, dst, true)
     compute_elastic_force(inner_coords, inner_coords_s, P, differentials, dst, true)
     if F.confine
-        compute_confinement_force(inner_coords, P, dst, true)
+        compute_confinement_force(inner_coords, P, plotables, dst, true)
     end
-    # compute_drag_force(inner_coords, inner_coords_s, P, F, dst, true)
-    compute_transport_force(inner_coords, inner_coords_s, P, F, dst, true)
+    compute_transport_force(inner_coords, inner_coords_s, P, F, plotables, dst, true)
 
     if F.innerloop
         dst[:] = vec(x) - vec(coords.x) - P.δt*dst
@@ -442,7 +460,7 @@ end
 function compute_residuals_J(x::Vector{Float64},
                              coords::PointCoords, coords_s::PointCoordsShifted,
                              inner_coords::PointCoords, inner_coords_s::PointCoordsShifted,
-                             P::Params, F::Flags,
+                             P::Params, F::Flags, plotables::Plotables,
                              dst_Df::SparseMatrixCSC{Float64})
 
     update_coords(inner_coords, P, reshape(x, (P.N, 2)))
@@ -464,11 +482,11 @@ function compute_residuals_J(x::Vector{Float64},
 end
 
 function wrap_residuals(coords::PointCoords, coords_s::PointCoordsShifted,
-                        P::Params, F::Flags)
+                        P::Params, F::Flags, plotables::Plotables)
     inner_coords = deepcopy(coords)
     inner_coords_s = new_PointCoordsShifted(inner_coords)
-    resi(x::Vector{Float64}, dst::Vector{Float64}) = compute_residuals(x, coords, coords_s, inner_coords, inner_coords_s, P, F, dst)
-    resi_J(x::Vector{Float64}, dst_Df::SparseMatrixCSC{Float64}) = compute_residuals_J(x, coords, coords_s, inner_coords, inner_coords_s, P, F, dst_Df)
+    resi(x::Vector{Float64}, dst::Vector{Float64}) = compute_residuals(x, coords, coords_s, inner_coords, inner_coords_s, P, F, plotables, dst)
+    resi_J(x::Vector{Float64}, dst_Df::SparseMatrixCSC{Float64}) = compute_residuals_J(x, coords, coords_s, inner_coords, inner_coords_s, P, F, plotables, dst_Df)
 
     return resi, resi_J
 end
