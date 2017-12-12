@@ -52,6 +52,11 @@ immutable Flags
     pretty::Bool
     continuous::Bool
     innerloop::Bool
+    weighted_confinement::Bool
+end
+
+immutable Metrics
+    iter::Int64
 end
 
 macro looped(array, i_min, i_max)

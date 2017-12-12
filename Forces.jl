@@ -58,6 +58,7 @@ struct Plotables
     ∇field::Matrix{Float64}
     transport_force::Matrix{Float64}
     drag_force::Matrix{Float64}
+    mass_source::Vector{Float64}
 end
 
 mutable struct Differentials
@@ -169,6 +170,7 @@ function new_plotables(N::Int64)
         zeros(N,2), # ∇field
         zeros(N,2), # transport_force
         zeros(N,2), # drag_force
+        zeros(N),   # mass_source
        )
 end
 
@@ -269,8 +271,11 @@ end
 function compute_confinement_force(coords::PointCoords,
                                    P::Params, plotables::Plotables,
                                    dst_f::Vector{Float64},
-                                   add::Bool=false)
+                                   add::Bool=false, weighted::Bool=false)
     field, ∇field, H_field = Wall.compute_field(coords.x, P; gradient=true, hessian=false)
+    if weighted
+        copy!(∇field, coords.Δ2L.*∇field/2P.Δσ)
+    end
     if add
         copy!(dst_f, dst_f + vec(-∇field))
     else
@@ -283,8 +288,13 @@ end
 function compute_confinement_force(coords::PointCoords,
                                    P::Params,
                                    dst_Df::SparseMatrixCSC{Float64},
-                                   add::Bool=false)
+                                   add::Bool=false, weighted::Bool=false)
     field, ∇field, H_field = Wall.compute_field(coords.x, P; gradient=true, hessian=true)
+    if weighted
+        aux = ([[D1c_short_unorm.*coords.τc[:,1] D1c_short_unorm.*coords.τc[:,2]]
+                [D1c_short_unorm.*coords.τc[:,1] D1c_short_unorm.*coords.τc[:,2]]])
+        H_field = (AdhCommon.@bc_scalar(coords.Δ2L).*H_field + vec(∇field).*aux)/2P.Δσ
+    end
     if add
         dst_Df[:] = dst_Df - H_field
     else
@@ -306,20 +316,13 @@ function compute_density_increment(coords::PointCoords, coords_s::PointCoordsShi
     # computation of the density increment
     ΔLc = 0.5*(coords.ΔL + coords_s.ΔL_m)
 
-    front_norm = (1-2*a)*ΔLc[x_max_idx] + a*(ΔLc[idxmod(x_max_idx-1, P.N)] + ΔLc[idxmod(x_max_idx+1, P.N)])
-    back_norm = (1-2*a)*ΔLc[x_min_idx] + a*(ΔLc[idxmod(x_min_idx-1, P.N)] + ΔLc[idxmod(x_min_idx+1, P.N)])
+    mask_front, mask_back = compute_mask(coords, 1.0, 6.0)
+
+    front_norm = sum(mask_front.*ΔLc)
+    back_norm = sum(mask_back.*ΔLc)
 
     f = zeros(P.N)
-
-    # front section
-    f[x_max_idx] = (1-2*a)*P.c/front_norm
-    f[idxmod(x_max_idx-1, P.N)] = a*P.c/front_norm
-    f[idxmod(x_max_idx+1, P.N)] = a*P.c/front_norm
-
-    # back section
-    f[x_min_idx] = -(1-2*a)*P.c/back_norm
-    f[idxmod(x_min_idx-1, P.N)] = -a*P.c/back_norm
-    f[idxmod(x_min_idx+1, P.N)] = -a*P.c/back_norm
+    f = P.c*(mask_front/front_norm - mask_back/back_norm)
 
     return f
 end
@@ -331,35 +334,34 @@ end
 function cumsum_zero(f::Array{Float64})
     z = zeros(f)
     cumsum!(z, f, 1)
-    z = 0.5z + 0.5circshift(z, 1)
+    z -= f
+    # z = 0.5z + 0.5circshift(z, 1)
     return z
 end
 
 function split_cumsum(a::Array{Float64,1}, idx)
-    b = zeros(a)
     N = length(a)
-    b[idx+1:end]  = cumsum(a[idx:end-1])
-    b[idx-1:-1:1] = cumsum(a[idx-1:-1:1])
 
-    m = 1
-    p = N
+    aux = zeros(a)
 
-    while abs(b[m] - b[p]) > a[p]
-        if b[m] < b[p]
-            b[p] = b[m] + a[p]
-            m = idxmod(m+1, N)
-            p = idxmod(p+1, N)
-        else
-            b[m] = b[p] + a[p]
-            m = idxmod(m-1, N)
-            p = idxmod(p-1, N)
-        end
-    end
+    dist_left = copy(a)
+    dist_left[idx] = 0.0
+    circshift!(aux, dist_left, N-idx)
+    reverse!(aux)
+    cumsum!(aux, aux)
+    reverse!(aux)
+    circshift!(dist_left, aux, idx-N)
 
-    return b
+    dist_right = copy(a)
+    dist_right[idx] = 0.0
+    circshift!(aux, dist_right, 1-idx)
+    cumsum!(aux, aux)
+    circshift!(dist_right, aux, idx-1)
+
+    return min.(dist_left, dist_right)
 end
 
-function compute_drag_mask(coords::PointCoords, half_w::Float64, pow::Float64=2.0)
+function compute_mask(coords::PointCoords, half_w::Float64, pow::Float64=2.0)
     x_min, x_min_idx = findmin(coords.x[:,2])
     x_max, x_max_idx = findmax(coords.x[:,2])
 
@@ -373,7 +375,7 @@ function compute_drag_mask(coords::PointCoords, half_w::Float64, pow::Float64=2.
     profile_max .*= profile_max .> 1e-5
     profile_max .*= 0.5/sum(profile_max)
 
-    return profile_min + profile_max
+    return profile_max, profile_min
 end
 
 function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
@@ -382,14 +384,20 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
                                  add::Bool=false)
 
     f = compute_density_increment(coords, coords_s, P, F)
+    plotables.mass_source[:] = f
 
     # computation of the transport term
     cum_added_mass = 0.5 * cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
 
-    plotables.transport_force[:] = -(-0.5*P.c + cum_added_mass) .* coords.Δ2x/2P.Δσ
+    # plotables.transport_force[:] = -(-0.5*P.c + cum_added_mass) .* coords.Δ2x/2P.Δσ
+    plotables.transport_force[:] = -(-0.5*P.c + cum_added_mass) .* coords.Δx/P.Δσ
 
-    drag_mask = compute_drag_mask(coords, 5.0, 4.0)
-    plotables.drag_force[:] = -(0.5drag_mask.*sum(f.*(coords.ΔL + coords_s.ΔL_m).*coords.x, 1))/P.Δσ
+    drag_mask_f, drag_mask_b = compute_mask(coords, 4.0, 4.0)
+    drag_mask = drag_mask_f + drag_mask_b
+
+    # caution, the centered difference operator is not skewsymmetric
+    # plotables.drag_force[:] = drag_mask.*sum(cum_added_mass .* coords.Δ2x/2P.Δσ, 1)
+    plotables.drag_force[:] = drag_mask.*sum(cum_added_mass .* coords.Δx/P.Δσ, 1)
 
     if add
         copy!(dst_f, dst_f + vec(plotables.transport_force + plotables.drag_force))
@@ -408,7 +416,8 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
     # computation of the transport term
     cum_added_mass = 0.5 * cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
 
-    D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1c
+    # D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1c
+    D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1p
 
     if add
         dst_Df[:] = dst_Df + D_transport_force
@@ -445,7 +454,7 @@ function compute_residuals(x::Vector{Float64},
     compute_pressure_force(inner_coords, P, dst, true)
     compute_elastic_force(inner_coords, inner_coords_s, P, differentials, dst, true)
     if F.confine
-        compute_confinement_force(inner_coords, P, plotables, dst, true)
+        compute_confinement_force(inner_coords, P, plotables, dst, true, F.weighted_confinement)
     end
     compute_transport_force(inner_coords, inner_coords_s, P, F, plotables, dst, true)
 
@@ -474,7 +483,7 @@ function compute_residuals_J(x::Vector{Float64},
     compute_pressure_force(inner_coords, P, dst_Df, true)
     compute_elastic_force(inner_coords, inner_coords_s, P, differentials, dst_Df, true)
     if F.confine
-        compute_confinement_force(inner_coords, P, dst_Df, true)
+        compute_confinement_force(inner_coords, P, dst_Df, true, F.weighted_confinement)
     end
     compute_transport_force(inner_coords, inner_coords_s, P, F, differentials, dst_Df, true)
 

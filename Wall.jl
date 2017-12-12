@@ -90,9 +90,9 @@ function compute_walls(y::Vector, params::Params, levelset::Float64=0.0)
     end
 end
 
-function compute_field(x::Matrix, params::Params; gradient::Bool=true, hessian::Bool=true)
+function compute_field(x::Matrix, params::Params; gradient::Bool=true, hessian::Bool=true, weighted::Bool=false)
     local N = params.N
-    prefac = 1e1
+    prefac = 1e0
     α = params.f_α
     β = params.f_β
     if α == 0
@@ -120,7 +120,11 @@ function compute_field(x::Matrix, params::Params; gradient::Bool=true, hessian::
         end
         return prefac*f, prefac*∇f, prefac*spzeros(2N, 2N)
     end
-    return prefac*f, Matrix(0, 0), spzeros(2N, 2N)
+    if weighted
+        return prefac*f, Matrix(0, 0), spzeros(2N, 2N)
+    else
+        return prefac*f, Matrix(0, 0), spzeros(2N, 2N)
+    end
 end
 
 function check_OOB(x::Matrix, params::Dict{String,Float64})

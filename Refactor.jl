@@ -21,7 +21,8 @@ function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
     ax[:set_aspect]("equal", "datalim")
 
     line = ax[:plot](x[:,1], x[:,2], ".-", zorder=1)[1]
-    tracker = ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
+    ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
+    # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
     ax[:plot](x[:,1], x[:,2], color="black", lw=0.5)[1] # initial condition
 
     y = collect(linspace(-40, 40, 1000))
@@ -33,11 +34,6 @@ function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
     ax[:plot](levelset, y, -levelset, y, color="red", lw=0.5)
 
     ax[:axvline](0)
-
-    # quiver1 = ax[:quiver](x[:,1], x[:,2], quiver_data1[:,1], quiver_data1[:,2], units="x", width=0.001, color="blue")
-    # quiver2 = ax[:quiver](x[:,1], x[:,2], quiver_data2[:,1], quiver_data2[:,2], scale_units="x", width=0.001, color="blue")
-    # quiver3 = ax[:quiver](x[:,1], x[:,2], quiver_data3[:,1], quiver_data3[:,2], units="x", width=0.001, color="blue")
-    # quiver4 = ax[:quiver](x[:,1], x[:,2], quiver_data4[:,1], quiver_data4[:,2], units="x", width=0.001, color="blue")
 
     # figManager = PyPlot.get_current_fig_manager()
     # figManager[:window][:showMaximized]()
@@ -64,27 +60,22 @@ function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags,
     else
         prefix = ""
     end
-    ax[:set_title](@sprintf("%s N: %d, iter: %d", prefix, P.N, k))
+    ax[:set_title](@sprintf("%s N: %d, iter: %d, T=%fs", prefix, P.N, k, k*P.δt))
 
     # effective angle force
     # FA = @entry_norm(reshape(M_DFangle * δx, N, 2))/δt
 
+    # drag force
     scatters[1][:set_offsets](x[:,:])
-    scatters[1][:set_sizes](AdhCommon.@entry_norm(plotables.drag_force))
-    # tracker[:set_facecolors](map(x-> x>1-1e-10 ? "#00FF00" : "#FF0000", drag_mask[tr_idx]))
-    # tracker[:set_facecolors](map(x-> x>1-1e-10 ? "#00FF00" : "#FF0000", mask[tr_idx]))
+    scatters[1][:set_sizes](20AdhCommon.@entry_norm(plotables.drag_force))
+    scatters[1][:set_facecolor](Utils.scale_cm(plotables.mass_source, PyPlot.get_cmap("RdYlGn");
+                                                range_min=Nullable(-P.c), range_max=Nullable(P.c)))
 
-    # quiver1[:set_offsets](x)
-    # quiver1[:set_UVC](quiver_data1[:,1], quiver_data1[:,2])
-
-    # quiver2[:set_offsets](x)
-    # quiver2[:set_UVC](quiver_data2[:,1], quiver_data2[:,2])
-
-    # quiver3[:set_offsets](x)
-    # quiver3[:set_UVC](quiver_data3[:,1], quiver_data3[:,2])
-
-    # quiver4[:set_offsets](x)
-    # quiver4[:set_UVC](quiver_data4[:,1], quiver_data4[:,2])
+    # mass source
+    # center = sum(x, 1)/P.N
+    # offset_from_center = broadcast(-, x, center)
+    # scatters[2][:set_offsets](broadcast(+, center, 0.95offset_from_center))
+    # scatters[2][:set_sizes](50abs.(plotables.mass_source))
 
     PyPlot.draw()
     sleep(0.0001)
@@ -94,40 +85,44 @@ end
 function main()
     # initialization
 
-    N = 100
+    N = 1*101
 
     AdhCommon.init(N)
+
+    a = 4e0
+    b = 5e0
+    c = 4.5e0
 
     # Parameters
     P = AdhCommon.Params(
              N, # number of points
-             100000, # max. number of iterations
+             20000, # max. number of iterations
 
              1/N, # space step
-             1e-3, # time step
+             2e-3, # time step
 
-             3e-1, # pressure
-             5e-2, # membrane elasticity
+             a*6.15e-1, # pressure
+             b*5e-2, # membrane elasticity
              1, # cortex viscosity
 
-             2e-1, # polymerization speed
+             c*4e-1, # polymerization speed
 
              16, # concentration of drag force in 1/(number of nodes)
 
-             2*4.1, # initial ellipsis width
-             2*4.1, # initial ellipsis height
+             3.1, # initial ellipsis width
+             3.1, # initial ellipsis height
              0.0, # initial vertical shift
 
              # Confinement field
 
-             5e0, # sharpness
-             0.0, # depth
-             1, # pulsation
+             1e1, # sharpness
+             0.5, # depth
+             2.5, # pulsation
              1, # direction
              1, # number of Fourier components
              # to approximate a saw-tooth signal
-             5.5, # mean width
-             5.0 # inner width
+             2.0, # mean width
+             3.0 # inner width
             )
 
     println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
@@ -135,7 +130,7 @@ function main()
 
     # Flags
     F = AdhCommon.Flags(
-            false,  # confine
+            true,  # confine
             false, # adjust_drag
             false, # polymerize
             true,  # dryrun
@@ -143,6 +138,7 @@ function main()
             false, # pretty
             true,  # continuous
             false, # innerloop
+            true,  # weighted_confinement
            )
 
     plotables = Forces.new_plotables(N)
@@ -189,20 +185,21 @@ function main()
 
 
         # plot
-        if F.plot & (k % 10 == 0)
+        plot_period = 20
+        if F.plot & (k % plot_period == 0)
             update_plot(x, k, P, F, false, plotables)
             height = sum(x[:,2]/P.N)
-            long_speed = (height - prev_height) / 10P.δt
+            long_speed = (height - prev_height) / (plot_period*P.δt)
             prev_height = height
             println("Long. speed: ", long_speed)
         end
 
         l2_norm = sqrt(sum(abs2, x))
 
-        if l2_norm > 1e4
-            println("Divergence detected, aborting")
-            break
-        end
+        # if l2_norm > 1e4
+            # println("Divergence detected, aborting")
+            # break
+        # end
     end
 
     println("Finished, type Enter to exit")
