@@ -12,6 +12,12 @@ import EvenParam
 import PyPlot
 import NLsolve
 
+import YAML
+
+macro eval_if_string(s)
+    return esc(:(isa($s, String) ? eval(parse($s)) : $s))
+end
+
 function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
     PyPlot.ion()
 
@@ -84,66 +90,61 @@ end
 
 function main()
     # initialization
-
-    N = 1*101
-
-    AdhCommon.init(N)
-
-    a = 4e0
-    b = 5e0
-    c = 4.5e0
+    yaml_config = YAML.load(open("config.yaml"))
+    y_params = yaml_config["params"]
 
     # Parameters
     P = AdhCommon.Params(
-             N, # number of points
-             20000, # max. number of iterations
-
-             1/N, # space step
-             2e-3, # time step
-
-             a*6.15e-1, # pressure
-             b*5e-2, # membrane elasticity
-             1, # cortex viscosity
-
-             c*4e-1, # polymerization speed
-
-             16, # concentration of drag force in 1/(number of nodes)
-
-             3.1, # initial ellipsis width
-             3.1, # initial ellipsis height
-             0.0, # initial vertical shift
-
-             # Confinement field
-
-             1e1, # sharpness
-             0.5, # depth
-             2.5, # pulsation
-             1, # direction
-             1, # number of Fourier components
-             # to approximate a saw-tooth signal
-             2.0, # mean width
-             3.0 # inner width
+            @eval_if_string(y_params["N"]),
+            y_params["M"],
+            1/y_params["N"], # Δσ
+            y_params["δt"],
+            @eval_if_string(y_params["P"]),
+            @eval_if_string(y_params["K"]),
+            @eval_if_string(y_params["Ka"]),
+            @eval_if_string(y_params["c"]),
+            y_params["x0_a"],
+            y_params["x0_b"],
+            y_params["x0_shift"],
+            y_params["f_α"],
+            y_params["f_β"],
+            y_params["f_ω0"],
+            y_params["f_σ"],
+            y_params["f_nk"],
+            y_params["f_width"],
+            y_params["f_iwidth"],
+            y_params["drag_gauss_power"],
+            y_params["drag_gauss_width"],
+            y_params["mass_gauss_power"],
+            y_params["mass_gauss_width"]
             )
 
     println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
     println("critical pressure: ", 2*pi*P.K)
 
+    y_flags = yaml_config["flags"]
+
     # Flags
     F = AdhCommon.Flags(
-            true,  # confine
-            false, # adjust_drag
-            false, # polymerize
-            true,  # dryrun
-            true,  # plot
-            false, # pretty
-            true,  # continuous
-            false, # innerloop
-            true,  # weighted_confinement
+            y_flags["confine"],
+            y_flags["adjust_drag"],
+            y_flags["polymerize"],
+            y_flags["dryrun"],
+            y_flags["plot"],
+            y_flags["pretty"],
+            y_flags["continuous"],
+            y_flags["innerloop"],
+            y_flags["weighted_confinement"]
            )
 
-    plotables = Forces.new_plotables(N)
+    println(P)
+    println(F)
 
-    t = linspace(0, 1, N+1)[1:N]
+    AdhCommon.init(P.N)
+
+    plotables = Forces.new_plotables(P.N)
+
+    t = linspace(0, 1, P.N+1)[1:P.N]
 
     x_init = 0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)]
     x = EvenParam.reparam(x_init, true)
@@ -156,9 +157,9 @@ function main()
     if F.innerloop
         resi_solver = NLsolve.DifferentiableSparseMultivariateFunction(resi, resi_J)
     else
-        r_x = zeros(2N)
-        Jr_x = spzeros(2N,2N)
-        δx = zeros(2N)
+        r_x = zeros(2P.N)
+        Jr_x = spzeros(2P.N,2P.N)
+        δx = zeros(2P.N)
     end
 
     k = 0

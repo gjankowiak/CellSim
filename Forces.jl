@@ -316,7 +316,7 @@ function compute_density_increment(coords::PointCoords, coords_s::PointCoordsShi
     # computation of the density increment
     ΔLc = 0.5*(coords.ΔL + coords_s.ΔL_m)
 
-    mask_front, mask_back = compute_mask(coords, 1.0, 6.0)
+    mask_front, mask_back = compute_mask(coords, P.mass_gauss_width, P.mass_gauss_power)
 
     front_norm = sum(mask_front.*ΔLc)
     back_norm = sum(mask_back.*ΔLc)
@@ -390,14 +390,16 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
     cum_added_mass = 0.5 * cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
 
     # plotables.transport_force[:] = -(-0.5*P.c + cum_added_mass) .* coords.Δ2x/2P.Δσ
-    plotables.transport_force[:] = -(-0.5*P.c + cum_added_mass) .* coords.Δx/P.Δσ
+    # plotables.transport_force[:] = -(-0.5*P.c + cum_added_mass) .* coords.Δx/P.Δσ
+    # plotables.transport_force[:] = (0.5P.Δσ*sum(cum_added_mass)-cum_added_mass).*coords.Δx/P.Δσ
+    plotables.transport_force[:] = (P.Δσ*sum(cum_added_mass)-cum_added_mass).*coords.Δ2x/2P.Δσ
 
-    drag_mask_f, drag_mask_b = compute_mask(coords, 4.0, 4.0)
+    drag_mask_f, drag_mask_b = compute_mask(coords, P.drag_gauss_width, P.drag_gauss_power)
     drag_mask = drag_mask_f + drag_mask_b
 
     # caution, the centered difference operator is not skewsymmetric
-    # plotables.drag_force[:] = drag_mask.*sum(cum_added_mass .* coords.Δ2x/2P.Δσ, 1)
-    plotables.drag_force[:] = drag_mask.*sum(cum_added_mass .* coords.Δx/P.Δσ, 1)
+    plotables.drag_force[:] = drag_mask.*sum(cum_added_mass .* coords.Δ2x/2P.Δσ, 1)
+    # plotables.drag_force[:] = drag_mask.*sum(cum_added_mass .* coords.Δx/P.Δσ, 1)
 
     if add
         copy!(dst_f, dst_f + vec(plotables.transport_force + plotables.drag_force))
@@ -416,8 +418,8 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
     # computation of the transport term
     cum_added_mass = 0.5 * cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
 
-    # D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1c
-    D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1p
+    D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1c
+    # D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1p
 
     if add
         dst_Df[:] = dst_Df + D_transport_force

@@ -1,0 +1,44 @@
+params:
+    N: 100 # number of points
+    M: 20000 # max. number of iterations
+
+    δt: 2e-3 # time step
+
+    P: 4*6.15e-1 # pressure
+    K: 5*5e-2 # membrane elasticity
+    Ka: 1 # cortex viscosity
+
+    c: 6.5*4e-1 # polymerization speed
+
+    x0_a: 3.1 # initial ellipsis width
+    x0_b: 3.1 # initial ellipsis height
+    x0_shift: 0.0 # initial vertical shift
+
+        # Confinement field
+
+    f_α: 1e1 # sharpness
+    f_β: 0.5 # depth
+    f_ω0: 2.5 # pulsation
+    f_σ: 1 # direction
+    f_nk: 1 # number of Fourier components
+        # to approximate a saw-tooth signal
+    f_width: 2.0 # mean width
+    f_iwidth: 3.0 # inner width
+
+    drag_gauss_power: 4.0 # drag_gauss_power
+    drag_gauss_width: 3.0 # drag_gauss_width
+
+    mass_gauss_power: 6.0 # mass_gauss_power
+    mass_gauss_width: 1.0 # mass_gauss_width
+
+
+flags:
+    confine:              true
+    adjust_drag:          false
+    polymerize:           false
+    dryrun:               true
+    plot:                 true
+    pretty:               false
+    continuous:           true
+    innerloop:            false
+    weighted_confinement: true

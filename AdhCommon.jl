@@ -20,7 +20,6 @@ immutable Params
     K::Float64    # membrane elasticity
     Ka::Float64   # cortex viscosity
     c::Float64    # polymerization speed
-    drag_conc::Float64 # concentration of drag force in 1/(number of nodes)
 
     x0_a::Float64      # initial ellipsis width
     x0_b::Float64      # initial ellipsis height
@@ -37,10 +36,11 @@ immutable Params
     f_width::Float64  # mean width
     f_iwidth::Float64 # inner width
 
-    # If pressure is unset, set it as a Lagrange multiplier
-    # to achieve area_multiplier * area0 final area, where
-    # area0 is the area of the initial data.
-    # area_mp::Float64
+    drag_gauss_power::Float64 # gaussian power in the drag mask
+    drag_gauss_width::Float64 # gaussian width in the drag mask
+
+    mass_gauss_power::Float64 # gaussian power in the mass mask
+    mass_gauss_width::Float64 # gaussian width in the mass mask
 end
 
 immutable Flags
