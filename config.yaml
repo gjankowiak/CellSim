@@ -1,6 +1,6 @@
 params:
     N: 100 # number of points
-    M: 20000 # max. number of iterations
+    M: 10000 # max. number of iterations
 
     δt: 2e-3 # time step
 
@@ -16,7 +16,7 @@ params:
 
         # Confinement field
 
-    f_α: 5e0 # sharpness
+    f_α: 2e1 # sharpness
     f_β: 0.1 # depth
     f_ω0: 2.5 # pulsation
     f_σ: 1 # direction
@@ -42,3 +42,6 @@ flags:
     continuous:           true
     innerloop:            false
     weighted_confinement: true
+    write_animation:      true
+    landscape_plot:       true
+    plot_drag:            true

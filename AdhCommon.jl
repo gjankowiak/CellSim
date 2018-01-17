@@ -53,6 +53,9 @@ immutable Flags
     continuous::Bool
     innerloop::Bool
     weighted_confinement::Bool
+    write_animation::Bool
+    landscape_plot::Bool
+    plot_drag::Bool
 end
 
 immutable Metrics
