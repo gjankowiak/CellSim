@@ -59,6 +59,7 @@ struct Plotables
     transport_force::Matrix{Float64}
     drag_force::Matrix{Float64}
     mass_source::Vector{Float64}
+    mass_source_int::Vector{Float64}
 end
 
 mutable struct Differentials
@@ -171,6 +172,7 @@ function new_plotables(N::Int64)
         zeros(N,2), # transport_force
         zeros(N,2), # drag_force
         zeros(N),   # mass_source
+        zeros(N),   # mass_source_int
        )
 end
 
@@ -379,47 +381,40 @@ function compute_mask(coords::PointCoords, half_w::Float64, pow::Float64=2.0)
 end
 
 function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
-                                 P::Params, F::Flags, plotables::Plotables,
+                                 P::Params, F::Flags, plt::Plotables,
                                  dst_f::Vector{Float64},
                                  add::Bool=false)
 
     f = compute_density_increment(coords, coords_s, P, F)
-    plotables.mass_source[:] = f
+    plt.mass_source[:] = 0.5(f.*(coords.ΔL + coords_s.ΔL_m))
 
     # computation of the transport term
-    cum_added_mass = 0.5 * cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
+    plt.mass_source_int[:] = 0.5cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
 
-    # plotables.transport_force[:] = -(-0.5*P.c + cum_added_mass) .* coords.Δ2x/2P.Δσ
-    # plotables.transport_force[:] = -(-0.5*P.c + cum_added_mass) .* coords.Δx/P.Δσ
-    # plotables.transport_force[:] = (0.5P.Δσ*sum(cum_added_mass)-cum_added_mass).*coords.Δx/P.Δσ
-    plotables.transport_force[:] = (P.Δσ*sum(cum_added_mass)-cum_added_mass).*coords.Δ2x/2P.Δσ
+    plt.transport_force[:] = (P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int).*coords.Δ2x/2P.Δσ
 
     drag_mask_f, drag_mask_b = compute_mask(coords, P.drag_gauss_width, P.drag_gauss_power)
     drag_mask = drag_mask_f + drag_mask_b
 
     # caution, the centered difference operator is not skewsymmetric
-    plotables.drag_force[:] = drag_mask.*sum(cum_added_mass .* coords.Δ2x/2P.Δσ, 1)
-    # plotables.drag_force[:] = drag_mask.*sum(cum_added_mass .* coords.Δx/P.Δσ, 1)
+    plt.drag_force[:] = drag_mask.*sum(plt.mass_source_int .* coords.Δ2x/2P.Δσ, 1)
+    # plt.drag_force[:] = drag_mask.*sum(plt.mass_source_int .* coords.Δx/P.Δσ, 1)
 
     if add
-        copy!(dst_f, dst_f + vec(plotables.transport_force + plotables.drag_force))
+        copy!(dst_f, dst_f + vec(plt.transport_force + plt.drag_force))
     else
-        copy!(dst_f, vec(plotables.transport_force + plotables.drag_force))
+        copy!(dst_f, vec(plt.transport_force + plt.drag_force))
     end
 end
 
 function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
-                                 P::Params, F::Flags,
+                                 P::Params, F::Flags, plt::Plotables,
                                  diffs::Differentials,
                                  dst_Df::SparseMatrixCSC{Float64},
                                  add::Bool=false)
-    f = compute_density_increment(coords, coords_s, P, F)
 
-    # computation of the transport term
-    cum_added_mass = 0.5 * cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
-
-    D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1c
-    # D_transport_force = AdhCommon.@bc_scalar(-(-0.5P.c + cum_added_mass)) .* D1p
+    D_transport_force = AdhCommon.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1c
+    # D_transport_force = AdhCommon.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1p
 
     if add
         dst_Df[:] = dst_Df + D_transport_force
@@ -483,11 +478,14 @@ function compute_residuals_J(x::Vector{Float64},
         empty!(dst_Df.nzval)
     end
     compute_pressure_force(inner_coords, P, dst_Df, true)
-    compute_elastic_force(inner_coords, inner_coords_s, P, differentials, dst_Df, true)
+    compute_elastic_force(inner_coords, inner_coords_s,
+                          P, differentials, dst_Df, true)
     if F.confine
         compute_confinement_force(inner_coords, P, dst_Df, true, F.weighted_confinement)
     end
-    compute_transport_force(inner_coords, inner_coords_s, P, F, differentials, dst_Df, true)
+    compute_transport_force(inner_coords, inner_coords_s,
+                            P, F, plotables,
+                            differentials, dst_Df, true)
 
     dst_Df[:] = speye(2P.N) - P.δt*dst_Df
 end
@@ -496,8 +494,10 @@ function wrap_residuals(coords::PointCoords, coords_s::PointCoordsShifted,
                         P::Params, F::Flags, plotables::Plotables)
     inner_coords = deepcopy(coords)
     inner_coords_s = new_PointCoordsShifted(inner_coords)
-    resi(x::Vector{Float64}, dst::Vector{Float64}) = compute_residuals(x, coords, coords_s, inner_coords, inner_coords_s, P, F, plotables, dst)
-    resi_J(x::Vector{Float64}, dst_Df::SparseMatrixCSC{Float64}) = compute_residuals_J(x, coords, coords_s, inner_coords, inner_coords_s, P, F, plotables, dst_Df)
+    resi(x::Vector{Float64}, dst::Vector{Float64}) =
+        compute_residuals(x, coords, coords_s, inner_coords, inner_coords_s, P, F, plotables, dst)
+    resi_J(x::Vector{Float64}, dst_Df::SparseMatrixCSC{Float64}) =
+        compute_residuals_J(x, coords, coords_s, inner_coords, inner_coords_s, P, F, plotables, dst_Df)
 
     return resi, resi_J
 end

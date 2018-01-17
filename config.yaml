@@ -16,17 +16,17 @@ params:
 
         # Confinement field
 
-    f_α: 1e1 # sharpness
-    f_β: 0.5 # depth
+    f_α: 5e0 # sharpness
+    f_β: 0.1 # depth
     f_ω0: 2.5 # pulsation
     f_σ: 1 # direction
     f_nk: 1 # number of Fourier components
         # to approximate a saw-tooth signal
     f_width: 2.0 # mean width
-    f_iwidth: 3.0 # inner width
+    f_iwidth: 3.0 # inner width, used
 
     drag_gauss_power: 4.0 # drag_gauss_power
-    drag_gauss_width: 3.0 # drag_gauss_width
+    drag_gauss_width: 3.5 # drag_gauss_width
 
     mass_gauss_power: 6.0 # mass_gauss_power
     mass_gauss_width: 1.0 # mass_gauss_width

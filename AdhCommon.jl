@@ -114,7 +114,7 @@ end
 end
 
 function perp!(src::Matrix, dst::Matrix)
-    if src === b
+    if src === dst
         throw("Source and destination arrays must be different")
     end
     dst[:,1] = src[:,2]
@@ -145,4 +145,14 @@ function pointwise_projection(bra, ket)
     return spdiagm(([bra[:,1].*ket[:,1]; bra[:,2].*ket[:,2]], bra[:,1].*ket[:,2], ket[:,1].*bra[:,2]), (0, -N, N), 2*N, 2*N)
 end
 
+"""
+    pointwise_dot_prod(v)
+
+    returns the matrix corresponding to the operator x → (x∙v)
+"""
+function pointwise_dot_prod(v)
+    N = size(v, 1)
+    return [v[:, 1].*speye(N) v[:,2].*speye(N)]
 end
+
+end # module

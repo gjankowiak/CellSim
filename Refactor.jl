@@ -27,9 +27,11 @@ function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
     ax[:set_aspect]("equal", "datalim")
 
     line = ax[:plot](x[:,1], x[:,2], ".-", zorder=1)[1]
+    polygon = ax[:fill](x[:,2], x[:,1], color="#f713e0", zorder=1)[1]
     ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
     # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
     ax[:plot](x[:,1], x[:,2], color="black", lw=0.5)[1] # initial condition
+
 
     y = collect(linspace(-40, 40, 1000))
     wall = Wall.compute_walls(y, P)
@@ -53,7 +55,9 @@ function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags,
     ax = PyPlot.gca()
     lines = ax[:lines]
     scatters = ax[:collections]
+    patches = ax[:patches]
     lines[1][:set_data](x[:,1], x[:,2])
+    patches[1][:set_xy](x)
     # tracker[:set_data](x[tr_idx,1], x[tr_idx,2])
 
     # line_dbg[:set_data](1:N, x[:,1]-x0[:,1])
