@@ -55,7 +55,7 @@ function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
         ax[:set_aspect]("equal", "datalim")
 
         line = ax[:plot](x[:,2], x[:,1], ".-", zorder=1)[1]
-        polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=1)[1]
+        polygon = ax[:fill](x[:,2], x[:,1], color="#f713e0", zorder=1)[1]
         ax[:scatter](x[:,2], x[:,1], color="black", zorder=2)
         # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
         ax[:plot](x[:,2], x[:,1], color="black", lw=0.5)[1] # initial condition
@@ -138,12 +138,40 @@ function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags,
     sleep(0.0001)
 end
 
+function compute_initial_x(P::AdhCommon.Params; convex::Bool=true)
+    t = linspace(0, 1, P.N+1)[1:P.N]
+
+    if convex
+        return 0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)]
+    end
+
+    cx, cy = 0.6, 0.9
+    xr = 0.24
+    xl = 1-xr
+    yr, yl = 0.25, 0.75
+    pow = 2.0
+    px, py = 1600, 600
+
+    circ_x = cospi.(2t)
+    bump_up = cx*exp.(-px*(t-xr).^pow)-cx*exp.(-px*(t-(0.5-xr)).^pow)
+    bump_down =  cx*exp.(-px*(t-xl).^pow)-cx*exp.(-px*(t-(1.5-xl)).^pow)
+
+    x = P.x0_a*(circ_x+bump_up+bump_down)
+    y =  P.x0_b*(sinpi.(2t)-cy*exp.(-py*(t-yr).^pow)+cy*exp.(-py*(t-yl).^pow))
+
+    return Float64[x y]
+end
+
 function main()
     # initialization
 
     config_filename = "config.yaml"
     if length(ARGS) > 0 && isfile(ARGS[1])
         config_filename = ARGS[1]
+    else
+        println("Please provide a configuration file!")
+        println("Usage: run.jl <config>")
+        exit(0)
     end
     yaml_config = YAML.load(open(config_filename))
     y_params = yaml_config["params"]
@@ -202,10 +230,9 @@ function main()
 
     plotables = Forces.new_plotables(P.N)
 
-    t = linspace(0, 1, P.N+1)[1:P.N]
+    x_init = EvenParam.reparam(compute_initial_x(P; convex=false))
 
-    x_init = 0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)]
-    x = EvenParam.reparam(x_init, true)
+    x = copy(x_init)
 
     fig = init_plot(x_init, P, F)
     if F.write_animation
