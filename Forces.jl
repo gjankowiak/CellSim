@@ -453,7 +453,9 @@ function compute_residuals(x::Vector{Float64},
     if F.confine
         compute_confinement_force(inner_coords, P, plotables, dst, true, F.weighted_confinement)
     end
-    compute_transport_force(inner_coords, inner_coords_s, P, F, plotables, dst, true)
+    if F.polymerize
+        compute_transport_force(inner_coords, inner_coords_s, P, F, plotables, dst, true)
+    end
 
     if F.innerloop
         dst[:] = vec(x) - vec(coords.x) - P.δt*dst
@@ -483,9 +485,12 @@ function compute_residuals_J(x::Vector{Float64},
     if F.confine
         compute_confinement_force(inner_coords, P, dst_Df, true, F.weighted_confinement)
     end
-    compute_transport_force(inner_coords, inner_coords_s,
-                            P, F, plotables,
-                            differentials, dst_Df, true)
+
+    if F.polymerize
+        compute_transport_force(inner_coords, inner_coords_s,
+                                P, F, plotables,
+                                differentials, dst_Df, true)
+    end
 
     dst_Df[:] = speye(2P.N) - P.δt*dst_Df
 end
