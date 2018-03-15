@@ -41,6 +41,8 @@ immutable Params
 
     mass_gauss_power::Float64 # gaussian power in the mass mask
     mass_gauss_width::Float64 # gaussian width in the mass mask
+
+    polar_shift::Float64 # how much to shift the obstacle to the right before polar projection
 end
 
 immutable Flags
@@ -56,6 +58,7 @@ immutable Flags
     write_animation::Bool
     landscape_plot::Bool
     plot_drag::Bool
+    circular_wall::Bool
 end
 
 immutable Metrics

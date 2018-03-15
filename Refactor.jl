@@ -40,13 +40,23 @@ function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
         ax[:plot](x[:,1], x[:,2], color="black", lw=0.5)[1] # initial condition
 
 
-        y = collect(linspace(-40, 40, 1000))
-        wall = Wall.compute_walls(y, P)
-        levelset = Wall.compute_walls(y, P, 1e-8)
-        ax[:plot](wall, y, -wall, y, color="black", lw=0.5)
 
-        levelset = Wall.compute_walls(y, P, 2e-4)
-        ax[:plot](levelset, y, -levelset, y, color="red", lw=0.5)
+        if F.circular_wall
+            y = collect(linspace(-1, 1, 1000))
+            wall_1 = Wall.compute_walls(y, P, F)
+            wall_2 = Wall.compute_walls(y, P, F; right=true)
+            ax[:plot](wall_1[:,1], wall_1[:,2], wall_2[:,1], wall_2[:,2], color="black", lw=0.5)
+
+            levelset_1 = Wall.compute_walls(y, P, F, 2e-4)
+            levelset_2 = Wall.compute_walls(y, P, F, 2e-4; right=true)
+            ax[:plot](levelset_1[:,1], levelset_1[:,2], levelset_2[:,1], levelset_2[:,2], color="red", lw=0.5)
+        else
+            y = collect(linspace(-40, 40, 1000))
+            wall = Wall.compute_walls(y, P, F)
+            ax[:plot](wall[:,1], wall[:,2], -wall[:,1], wall[:,2], color="black", lw=0.5)
+            levelset = Wall.compute_walls(y, P, F, 2e-4)
+            ax[:plot](levelset[:,1], levelset[:,2], -levelset[:,1], levelset[:,1], color="red", lw=0.5)
+        end
 
         ax[:axvline](0)
     else
@@ -60,14 +70,22 @@ function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
         # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
         ax[:plot](x[:,2], x[:,1], color="black", lw=0.5)[1] # initial condition
 
+        if F.circular_wall
+            y = collect(linspace(-1, 1, 1000))
+            wall_1 = Wall.compute_walls(y, P, F)
+            wall_2 = Wall.compute_walls(y, P, F; right=true)
+            ax[:plot](wall_1[:,2], wall_1[:,1], wall_2[:,2], wall_2[:,1], color="black", lw=0.5)
 
-        y = collect(linspace(-40, 40, 1000))
-        wall = Wall.compute_walls(y, P)
-        levelset = Wall.compute_walls(y, P, 1e-8)
-        ax[:plot](y, wall, y, -wall, color="black", lw=0.5)
-
-        levelset = Wall.compute_walls(y, P, 2e-4)
-        ax[:plot](y, levelset, y, -levelset, color="red", lw=0.5)
+            levelset_1 = Wall.compute_walls(y, P, F, 2e-4)
+            levelset_2 = Wall.compute_walls(y, P, F, 2e-4; right=true)
+            ax[:plot](levelset_1[:,2], levelset_1[:,1], levelset_2[:,2], levelset_2[:,1], color="red", lw=0.5)
+        else
+            y = collect(linspace(-40, 40, 1000))
+            wall = Wall.compute_walls(y, P, F)
+            ax[:plot](wall[:,1], wall[:,2], -wall[:,1], wall[:,2], color="black", lw=0.5)
+            levelset = Wall.compute_walls(y, P, F, 2e-4)
+            ax[:plot](levelset[:,2], levelset[:,1], -levelset[:,2], levelset[:,1], color="red", lw=0.5)
+        end
 
         ax[:axhline](0)
     end
@@ -112,7 +130,7 @@ function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags,
 
         x_min, x_max = minimum(x[:,2]), maximum(x[:,2])
         x_mid = 0.5(x_max+x_min)
-        ax[:set_ylim]((x_mid-15, x_mid+15))
+        # ax[:set_ylim]((x_mid-15, x_mid+15))
     else
         lines[1][:set_data](x[:,2], x[:,1])
         patches[1][:set_xy]([x[:,2] x[:,1]])
@@ -123,7 +141,7 @@ function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags,
         lims = ax[:get_xlim]()
         x_min, x_max = minimum(x[:,2]), maximum(x[:,2])
         x_mid = 0.5(x_max+x_min)
-        ax[:set_xlim]((x_mid-15, x_mid+15))
+        # ax[:set_xlim]((x_mid-15, x_mid+15))
     end
     if F.plot_drag
         scatters[1][:set_sizes](10AdhCommon.@entry_norm(plotables.drag_force))
@@ -138,11 +156,15 @@ function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags,
     sleep(0.0001)
 end
 
-function compute_initial_x(P::AdhCommon.Params; convex::Bool=true)
+function compute_initial_x(P::AdhCommon.Params, F::AdhCommon.Flags; convex::Bool=true)
     t = linspace(0, 1, P.N+1)[1:P.N]
 
     if convex
-        return 0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)]
+        if !F.circular_wall
+            return 0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)]
+        else
+            return 0.5 * Float64[P.x0_a*cospi.(2t)+2P.polar_shift P.x0_b*sinpi.(2t)]
+        end
     end
 
     cx, cy = 0.6, 0.9
@@ -159,7 +181,11 @@ function compute_initial_x(P::AdhCommon.Params; convex::Bool=true)
     x = P.x0_a*(circ_x+bump_up+bump_down)
     y =  P.x0_b*(sinpi.(2t)-cy*exp.(-py*(t-yr).^pow)+cy*exp.(-py*(t-yl).^pow))
 
-    return Float64[x y]
+    if !F.circular_wall
+        return Float64[x y]
+    else
+        return Float64[x+P.polar_shift y]
+    end
 end
 
 function main()
@@ -191,7 +217,7 @@ function main()
         y_params["x0_shift"],
         y_params["f_α"],
         y_params["f_β"],
-        y_params["f_ω0"],
+        @eval_if_string(y_params["f_ω0"]),
         y_params["f_σ"],
         y_params["f_nk"],
         y_params["f_width"],
@@ -199,7 +225,8 @@ function main()
         y_params["drag_gauss_power"],
         y_params["drag_gauss_width"],
         y_params["mass_gauss_power"],
-        y_params["mass_gauss_width"]
+        y_params["mass_gauss_width"],
+        y_params["polar_shift"]
    )
 
     println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
@@ -220,7 +247,8 @@ function main()
           y_flags["weighted_confinement"],
           y_flags["write_animation"],
           y_flags["landscape_plot"],
-          y_flags["plot_drag"]
+          y_flags["plot_drag"],
+          y_flags["circular_wall"]
     )
 
     println(P)
@@ -230,10 +258,9 @@ function main()
 
     plotables = Forces.new_plotables(P.N)
 
-    x_init = EvenParam.reparam(compute_initial_x(P; convex=false))
+    x_init = EvenParam.reparam(compute_initial_x(P, F; convex=true))
 
     x = copy(x_init)
-
     fig = init_plot(x_init, P, F)
     if F.write_animation
         writer = init_animation()
@@ -258,6 +285,7 @@ function main()
     # outer loop
     while k < P.M
         k += 1
+        # println("iteration #", k)
 
         # inner loop
         if k > 1
@@ -276,7 +304,7 @@ function main()
 
 
         # plot
-        plot_period = 20
+        plot_period = 10
         if F.plot & (k % plot_period == 0)
             update_plot(x, k, P, F, false, plotables)
             if F.write_animation

@@ -226,6 +226,23 @@ function init_FD_matrices(P::Params)
     const global D5_perp  = ([[spzeros(N,N) -D5_short];[D5_short spzeros(N,N)]])
 end
 
+function compute_front_back(coords::PointCoords, P::Params, F::Flags)
+    if !F.circular_wall
+        x_min, x_min_idx = findmin(coords.x[:,2])
+        x_max, x_max_idx = findmax(coords.x[:,2])
+        return ((x_min, x_min_idx), (x_max, x_max_idx))
+    else
+        ang = angle.(complex(coords.x[:,1] + coords.x[:,2]im))
+        x_min, x_min_idx = findmin(ang)
+        x_max, x_max_idx = findmax(ang)
+        if (x_max - x_min) > pi
+            x_min, x_max = x_max, x_min
+            x_min_idx, x_max_idx = x_max_idx, x_min_idx
+        end
+        return ((x_min, x_min_idx), (x_max, x_max_idx))
+    end
+end
+
 function compute_pressure_force(coords::PointCoords, P::Params,
                                 dst_f::Vector{Float64},
                                 add::Bool=false)
@@ -271,10 +288,10 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
 end
 
 function compute_confinement_force(coords::PointCoords,
-                                   P::Params, plotables::Plotables,
+                                   P::Params, F::Flags, plotables::Plotables,
                                    dst_f::Vector{Float64},
                                    add::Bool=false, weighted::Bool=false)
-    field, ∇field, H_field = Wall.compute_field(coords.x, P; gradient=true, hessian=false)
+    field, ∇field, H_field = Wall.compute_field(coords.x, P, F; gradient=true, hessian=false)
     if weighted
         copy!(∇field, coords.Δ2L.*∇field/2P.Δσ)
     end
@@ -288,10 +305,10 @@ function compute_confinement_force(coords::PointCoords,
 end
 
 function compute_confinement_force(coords::PointCoords,
-                                   P::Params,
+                                   P::Params, F::Flags,
                                    dst_Df::SparseMatrixCSC{Float64},
                                    add::Bool=false, weighted::Bool=false)
-    field, ∇field, H_field = Wall.compute_field(coords.x, P; gradient=true, hessian=true)
+    field, ∇field, H_field = Wall.compute_field(coords.x, P, F; gradient=true, hessian=true)
     if weighted
         aux = ([[D1c_short_unorm.*coords.τc[:,1] D1c_short_unorm.*coords.τc[:,2]]
                 [D1c_short_unorm.*coords.τc[:,1] D1c_short_unorm.*coords.τc[:,2]]])
@@ -312,13 +329,12 @@ function compute_density_increment(coords::PointCoords, coords_s::PointCoordsShi
     """
     a = 0.25
 
-    x_min, x_min_idx = findmin(coords.x[:,2])
-    x_max, x_max_idx = findmax(coords.x[:,2])
+    ((x_min, x_min_idx), (x_max, x_max_idx)) = compute_front_back(coords, P, F)
 
     # computation of the density increment
     ΔLc = 0.5*(coords.ΔL + coords_s.ΔL_m)
 
-    mask_front, mask_back = compute_mask(coords, P.mass_gauss_width, P.mass_gauss_power)
+    mask_front, mask_back = compute_mask(coords, P, F, P.mass_gauss_width, P.mass_gauss_power)
 
     front_norm = sum(mask_front.*ΔLc)
     back_norm = sum(mask_back.*ΔLc)
@@ -363,9 +379,8 @@ function split_cumsum(a::Array{Float64,1}, idx)
     return min.(dist_left, dist_right)
 end
 
-function compute_mask(coords::PointCoords, half_w::Float64, pow::Float64=2.0)
-    x_min, x_min_idx = findmin(coords.x[:,2])
-    x_max, x_max_idx = findmax(coords.x[:,2])
+function compute_mask(coords::PointCoords, P::Params, F::Flags, half_w::Float64, pow::Float64=2.0)
+    ((x_min, x_min_idx), (x_max, x_max_idx)) = compute_front_back(coords, P, F)
 
     dst_from_min = split_cumsum(coords.ΔL, x_min_idx)
     dst_from_max = split_cumsum(coords.ΔL, x_max_idx)
@@ -393,7 +408,7 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
 
     plt.transport_force[:] = (P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int).*coords.Δ2x/2P.Δσ
 
-    drag_mask_f, drag_mask_b = compute_mask(coords, P.drag_gauss_width, P.drag_gauss_power)
+    drag_mask_f, drag_mask_b = compute_mask(coords, P, F, P.drag_gauss_width, P.drag_gauss_power)
     drag_mask = drag_mask_f + drag_mask_b
 
     # caution, the centered difference operator is not skewsymmetric
@@ -427,8 +442,7 @@ function compute_viscosity_force(coords::PointCoords, coords_s::PointCoordsShift
                                  P::Params, F::Flags,
                                  dst::Vector{Float64}, dst_Df::SparseMatrixCSC{Float64})
     throw("Not implemented")
-    x_min, x_min_idx = findmin(view(coords.x,:,2))
-    x_max, x_max_idx = findmax(view(coords.x,:,2))
+    ((x_min, x_min_idx), (x_max, x_max_idx)) = compute_front_back(coords, P, F)
 
     trsp_dir = 0.5P.c .* ((x_max_idx .< 1:params.N .< x_min_idx) - ((1:params.N .< x_max_idx) + (x_min_idx .< 1:params.N)))
 
@@ -451,7 +465,7 @@ function compute_residuals(x::Vector{Float64},
     compute_pressure_force(inner_coords, P, dst, true)
     compute_elastic_force(inner_coords, inner_coords_s, P, differentials, dst, true)
     if F.confine
-        compute_confinement_force(inner_coords, P, plotables, dst, true, F.weighted_confinement)
+        compute_confinement_force(inner_coords, P, F, plotables, dst, true, F.weighted_confinement)
     end
     if F.polymerize
         compute_transport_force(inner_coords, inner_coords_s, P, F, plotables, dst, true)
@@ -483,7 +497,7 @@ function compute_residuals_J(x::Vector{Float64},
     compute_elastic_force(inner_coords, inner_coords_s,
                           P, differentials, dst_Df, true)
     if F.confine
-        compute_confinement_force(inner_coords, P, dst_Df, true, F.weighted_confinement)
+        compute_confinement_force(inner_coords, P, F, dst_Df, true, F.weighted_confinement)
     end
 
     if F.polymerize
