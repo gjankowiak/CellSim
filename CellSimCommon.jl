@@ -43,6 +43,8 @@ immutable Params
     mass_gauss_width::Float64 # gaussian width in the mass mask
 
     polar_shift::Float64 # how much to shift the obstacle to the right before polar projection
+
+    k_MT::Float64 # (isotropic) MT/cortex friction coefficient
 end
 
 immutable Flags
@@ -59,6 +61,7 @@ immutable Flags
     landscape_plot::Bool
     plot_drag::Bool
     circular_wall::Bool
+    microtubules::Bool
 end
 
 immutable Metrics

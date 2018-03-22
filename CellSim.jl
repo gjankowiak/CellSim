@@ -226,7 +226,8 @@ function main()
         y_params["drag_gauss_width"],
         y_params["mass_gauss_power"],
         y_params["mass_gauss_width"],
-        y_params["polar_shift"]
+        y_params["polar_shift"],
+        y_params["k_MT"]
    )
 
     println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
@@ -248,7 +249,8 @@ function main()
           y_flags["write_animation"],
           y_flags["landscape_plot"],
           y_flags["plot_drag"],
-          y_flags["circular_wall"]
+          y_flags["circular_wall"],
+          y_flags["microtubules"]
     )
 
     println(P)
