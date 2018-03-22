@@ -1,4 +1,4 @@
-module AdhCommon
+module CellSimCommon
 
 export Params, Flags
 

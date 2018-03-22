@@ -1,6 +1,6 @@
 module Wall
 
-using AdhCommon
+using CellSimCommon
 
 export compute_field, compute_walls, check_OOB
 
@@ -17,7 +17,7 @@ and
     f_ω0::Float64     # pulsation
     f_σ::Int          # direction
     f_nk::Int         # number of Fourier components
-    (see AdhCommon.jl)
+    (see CellSimCommon.jl)
 
 with this notation,
     H'(x) = -(h'(x) log(αx) + h(x)/x)

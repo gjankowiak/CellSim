@@ -1,6 +1,6 @@
 module Forces
 
-using AdhCommon
+using CellSimCommon
 import Wall, Masks
 import Utils: spdiagm_const, idxmod
 
@@ -107,21 +107,21 @@ function new_PointCoordsShifted(coords::PointCoords)
     N = size(coords.x, 1)
 
     return PointCoordsShifted(
-        view(coords.Δx, AdhCommon.circ_idx_m1, :),
-        view(coords.Δx, AdhCommon.circ_idx_p1, :),
-        view(coords.ΔL, AdhCommon.circ_idx_m1),
-        view(coords.ΔL, AdhCommon.circ_idx_p1),
-        view(coords.ell, AdhCommon.circ_idx_m1),
-        view(coords.τ, AdhCommon.circ_idx_m1, :),
-        view(coords.v, AdhCommon.circ_idx_m1, :),
-        view(coords.v, AdhCommon.circ_idx_p1, :))
+        view(coords.Δx, CellSimCommon.circ_idx_m1, :),
+        view(coords.Δx, CellSimCommon.circ_idx_p1, :),
+        view(coords.ΔL, CellSimCommon.circ_idx_m1),
+        view(coords.ΔL, CellSimCommon.circ_idx_p1),
+        view(coords.ell, CellSimCommon.circ_idx_m1),
+        view(coords.τ, CellSimCommon.circ_idx_m1, :),
+        view(coords.v, CellSimCommon.circ_idx_m1, :),
+        view(coords.v, CellSimCommon.circ_idx_p1, :))
 end
 
 function new_Differentials(coords::PointCoords, coords_s::PointCoordsShifted)
-    Dτ = AdhCommon.@bc_scalar(1./coords.ΔL).*(AdhCommon.pointwise_projection(coords.v))*D1p_unorm
-    Dτc = AdhCommon.@bc_scalar(1./coords.Δ2L).*AdhCommon.pointwise_projection(coords.vc)*D1c_unorm
-    Dv = -AdhCommon.@bc_scalar(1./coords.ΔL).*(AdhCommon.pointwise_projection(coords.τ))*D1p_perp_unorm
-    Dvc = -AdhCommon.@bc_scalar(1./coords.Δ2L).*AdhCommon.pointwise_projection(coords.τc)*D1c_perp_unorm
+    Dτ = CellSimCommon.@bc_scalar(1./coords.ΔL).*(CellSimCommon.pointwise_projection(coords.v))*D1p_unorm
+    Dτc = CellSimCommon.@bc_scalar(1./coords.Δ2L).*CellSimCommon.pointwise_projection(coords.vc)*D1c_unorm
+    Dv = -CellSimCommon.@bc_scalar(1./coords.ΔL).*(CellSimCommon.pointwise_projection(coords.τ))*D1p_perp_unorm
+    Dvc = -CellSimCommon.@bc_scalar(1./coords.Δ2L).*CellSimCommon.pointwise_projection(coords.τc)*D1c_perp_unorm
     return Differentials(
         Dτ, Dτc, Dv, Dvc, M_cs_minus*Dτ
     )
@@ -129,13 +129,13 @@ end
 
 function update_coords(coords::PointCoords, P::Params, x::Matrix{Float64})
     coords.x[:] = x
-    AdhCommon.@delta!(x, coords.Δx)
-    coords.Δ2x[:] = x[AdhCommon.circ_idx_p1,:] - x[AdhCommon.circ_idx_m1,:]
+    CellSimCommon.@delta!(x, coords.Δx)
+    coords.Δ2x[:] = x[CellSimCommon.circ_idx_p1,:] - x[CellSimCommon.circ_idx_m1,:]
     coords.Δ2x_perp[:,1] = -coords.Δ2x[:,2]
     coords.Δ2x_perp[:,2] =  coords.Δ2x[:,1]
 
-    coords.ΔL[:] = AdhCommon.@entry_norm(coords.Δx)
-    coords.Δ2L[:] = AdhCommon.@entry_norm(coords.Δ2x)
+    coords.ΔL[:] = CellSimCommon.@entry_norm(coords.Δx)
+    coords.Δ2L[:] = CellSimCommon.@entry_norm(coords.Δ2x)
 
     coords.ell[:] = coords.ΔL/P.Δσ - 1
 
@@ -143,13 +143,13 @@ function update_coords(coords::PointCoords, P::Params, x::Matrix{Float64})
     coords.τ[:] = coords.Δx./coords.ΔL
 
     # centered unit tangent
-    coords.τc[:] = coords.Δ2x./AdhCommon.@entry_norm(coords.Δ2x)
+    coords.τc[:] = coords.Δ2x./CellSimCommon.@entry_norm(coords.Δ2x)
 
     # unit normal
     coords.v[:] = hcat(view(coords.τ,:,2), -view(coords.τ,:,1))
 
     # centered unit tangent
-    coords.vc[:] = -coords.Δ2x_perp./AdhCommon.@entry_norm(coords.Δ2x)
+    coords.vc[:] = -coords.Δ2x_perp./CellSimCommon.@entry_norm(coords.Δ2x)
 
     # derivatives of tangent and normal unit vectors
     coords.dτc[:] = D1c*vec(coords.τc)
@@ -160,7 +160,7 @@ function update_coords(coords::PointCoords, P::Params, x::Matrix{Float64})
 
     # auxiliary quantities
     coords.dvΔL[:] = 2P.Δσ*D1c_short*(coords.vc./coords.Δ2L)
-    coords.vd2τ[:] = AdhCommon.@dotprod(coords.vc, coords.d2τ)
+    coords.vd2τ[:] = CellSimCommon.@dotprod(coords.vc, coords.d2τ)
     coords.d1vd2τ[:] = D1c_short*coords.vd2τ
     coords.d2vd2τ[:] = D2_short*coords.vd2τ
 end
@@ -277,12 +277,12 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
                                dst_Df::SparseMatrixCSC{Float64},
                                add::Bool=false)
     if add
-        dst_Df[:] = dst_Df + P.K * (AdhCommon.pointwise_projection(coords.τ)*D1p - AdhCommon.pointwise_projection(coords_s.τ_m)*D1m
-                         + (AdhCommon.@bc_scalar(coords.ell).*diffs.Dτ - AdhCommon.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
+        dst_Df[:] = dst_Df + P.K * (CellSimCommon.pointwise_projection(coords.τ)*D1p - CellSimCommon.pointwise_projection(coords_s.τ_m)*D1m
+                         + (CellSimCommon.@bc_scalar(coords.ell).*diffs.Dτ - CellSimCommon.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
                         )/P.Δσ
     else
-        dst_Df[:] = P.K * (AdhCommon.pointwise_projection(coords.τ)*D1p - AdhCommon.pointwise_projection(coords_s.τ_m)*D1m
-                           + (AdhCommon.@bc_scalar(coords.ell).*diffs.Dτ - AdhCommon.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
+        dst_Df[:] = P.K * (CellSimCommon.pointwise_projection(coords.τ)*D1p - CellSimCommon.pointwise_projection(coords_s.τ_m)*D1m
+                           + (CellSimCommon.@bc_scalar(coords.ell).*diffs.Dτ - CellSimCommon.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
                           )/P.Δσ
     end
 end
@@ -312,7 +312,7 @@ function compute_confinement_force(coords::PointCoords,
     if weighted
         aux = ([[D1c_short_unorm.*coords.τc[:,1] D1c_short_unorm.*coords.τc[:,2]]
                 [D1c_short_unorm.*coords.τc[:,1] D1c_short_unorm.*coords.τc[:,2]]])
-        H_field = (AdhCommon.@bc_scalar(coords.Δ2L).*H_field + vec(∇field).*aux)/2P.Δσ
+        H_field = (CellSimCommon.@bc_scalar(coords.Δ2L).*H_field + vec(∇field).*aux)/2P.Δσ
     end
     if add
         dst_Df[:] = dst_Df - H_field
@@ -428,8 +428,8 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
                                  dst_Df::SparseMatrixCSC{Float64},
                                  add::Bool=false)
 
-    D_transport_force = AdhCommon.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1c
-    # D_transport_force = AdhCommon.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1p
+    D_transport_force = CellSimCommon.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1c
+    # D_transport_force = CellSimCommon.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1p
 
     if add
         dst_Df[:] = dst_Df + D_transport_force

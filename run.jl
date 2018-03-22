@@ -1,5 +1,5 @@
 push!(LOAD_PATH, ".")
 
-import Refactor
+import CellSim
 
-Refactor.main()
+CellSim.main()

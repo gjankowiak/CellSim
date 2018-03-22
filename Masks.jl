@@ -1,6 +1,6 @@
 module Masks
 
-using AdhCommon
+using CellSimCommon
 
 function compute_drag_mask(x::Array, half_w::Int, pow::Float64=2.0)
     const N = size(x, 1)
@@ -12,8 +12,8 @@ function compute_drag_mask(x::Array, half_w::Int, pow::Float64=2.0)
     profile = exp(-linspace(-3, 3, 2*half_w+1).^pow)
     profile .*= 0.5/sum(profile)
 
-    AdhCommon.@looped(mask, x_min_idx-half_w, x_min_idx+half_w) = profile
-    AdhCommon.@looped(mask, x_max_idx-half_w, x_max_idx+half_w) = profile
+    CellSimCommon.@looped(mask, x_min_idx-half_w, x_min_idx+half_w) = profile
+    CellSimCommon.@looped(mask, x_max_idx-half_w, x_max_idx+half_w) = profile
 
     return mask
 end

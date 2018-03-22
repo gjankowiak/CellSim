@@ -1,6 +1,6 @@
-module Refactor
+module CellSim
 
-import AdhCommon
+import CellSimCommon
 import Forces
 import Wall
 import Masks
@@ -21,7 +21,7 @@ macro eval_if_string(s)
     return esc(:(isa($s, String) ? eval(parse($s)) : $s))
 end
 
-function init_plot(x::Matrix, P::AdhCommon.Params, F::AdhCommon.Flags)
+function init_plot(x::Matrix, P::CellSimCommon.Params, F::CellSimCommon.Flags)
     PyPlot.ion()
 
     fig = PyPlot.figure(figsize=(12.8, 10))
@@ -106,7 +106,7 @@ function init_animation()
     return writer
 end
 
-function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags, initializing::Bool, plotables::Forces.Plotables)
+function update_plot(x::Matrix, k::Int, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::Forces.Plotables)
     ax = PyPlot.gca()
     if initializing
         prefix = "[INIT]"
@@ -144,9 +144,9 @@ function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags,
         # ax[:set_xlim]((x_mid-15, x_mid+15))
     end
     if F.plot_drag
-        scatters[1][:set_sizes](10AdhCommon.@entry_norm(plotables.drag_force))
+        scatters[1][:set_sizes](10CellSimCommon.@entry_norm(plotables.drag_force))
     else
-        scatters[1][:set_sizes](0AdhCommon.@entry_norm(plotables.drag_force))
+        scatters[1][:set_sizes](0CellSimCommon.@entry_norm(plotables.drag_force))
     end
     scatters[1][:set_facecolor](Utils.scale_cm(plotables.mass_source, PyPlot.get_cmap("RdYlGn");
                                                range_min=Nullable(-P.c), range_max=Nullable(P.c)))
@@ -156,7 +156,7 @@ function update_plot(x::Matrix, k::Int, P::AdhCommon.Params, F::AdhCommon.Flags,
     sleep(0.0001)
 end
 
-function compute_initial_x(P::AdhCommon.Params, F::AdhCommon.Flags; convex::Bool=true)
+function compute_initial_x(P::CellSimCommon.Params, F::CellSimCommon.Flags; convex::Bool=true)
     t = linspace(0, 1, P.N+1)[1:P.N]
 
     if convex
@@ -203,7 +203,7 @@ function main()
     y_params = yaml_config["params"]
 
     # Parameters
-    P = AdhCommon.Params(
+    P = CellSimCommon.Params(
         @eval_if_string(y_params["N"]),
         y_params["M"],
         1/y_params["N"], # Δσ
@@ -235,7 +235,7 @@ function main()
     y_flags = yaml_config["flags"]
 
     # Flags
-    F = AdhCommon.Flags(
+    F = CellSimCommon.Flags(
           y_flags["confine"],
           y_flags["adjust_drag"],
           y_flags["polymerize"],
@@ -254,7 +254,7 @@ function main()
     println(P)
     println(F)
 
-    AdhCommon.init(P.N)
+    CellSimCommon.init(P.N)
 
     plotables = Forces.new_plotables(P.N)
 
