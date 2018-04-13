@@ -1,5 +1,3 @@
-module Centrosome
-
 const sqrtEPS = 1e-5
 
 import Forces: PointCoords, PointCoordsShifted
@@ -37,6 +35,3 @@ function quadrature_weights(coords::PointCoords, coords_s::PointCoordsShifted, v
     I2 = -c1./c2*I1-c0./c2.*I0+1./c2
 
     w1 = Δσ*
-end
-
-end # module
