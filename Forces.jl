@@ -39,6 +39,9 @@ struct PointCoords
     vd2τ::Vector{Float64}
     d1vd2τ::Vector{Float64}
     d2vd2τ::Vector{Float64}
+
+    # centrosome
+    centro::Vector{Float64}
 end
 
 
