@@ -61,7 +61,7 @@ immutable Flags
     landscape_plot::Bool
     plot_drag::Bool
     circular_wall::Bool
-    microtubules::Bool
+    centrosome_only::Bool
 end
 
 immutable Metrics
@@ -162,6 +162,42 @@ end
 function pointwise_dot_prod(v)
     N = size(v, 1)
     return [v[:, 1].*speye(N) v[:,2].*speye(N)]
+end
+
+"""
+Stolen from https://github.com/mlubin/NaNMath.jl/blob/master/src/NaNMath.jl
+
+NaNMath.sum(A)
+##### Args:
+* `A`: An array of floating point numbers
+##### Returns:
+*    Returns the sum of all elements in the array, ignoring NaN's.
+##### Examples:
+```julia
+using NaNMath as nm
+nm.sum([1., 2., NaN]) # result: 3.0
+```
+"""
+function nansum(x::AbstractArray{T}) where T<:AbstractFloat
+    if length(x) == 0
+        result = zero(eltype(x))
+    else
+        result = convert(eltype(x), NaN)
+        for i in x
+            if !isnan(i)
+                if isnan(result)
+                    result = i
+                else
+                    result += i
+                end
+            end
+        end
+    end
+
+    if isnan(result)
+        Base.warn_once("All elements of the array, passed to \"sum\" are NaN!")
+    end
+    return result
 end
 
 end # module

@@ -4,8 +4,9 @@ import CellSimCommon
 import Forces
 import Wall
 import Masks
+import Centrosome
+
 import Utils
-# import Surface
 import SurfacesCommon
 import EvenParam
 
@@ -21,8 +22,10 @@ macro eval_if_string(s)
     return esc(:(isa($s, String) ? eval(parse($s)) : $s))
 end
 
-function init_plot(x::Matrix, P::CellSimCommon.Params, F::CellSimCommon.Flags)
+function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellSimCommon.Flags)
     PyPlot.ion()
+
+    x = coords.x
 
     fig = PyPlot.figure(figsize=(12.8, 10))
     # figManager = PyPlot.get_current_fig_manager()
@@ -33,13 +36,16 @@ function init_plot(x::Matrix, P::CellSimCommon.Params, F::CellSimCommon.Flags)
 
         ax[:set_aspect]("equal", "datalim")
 
-        line = ax[:plot](x[:,1], x[:,2], ".-", zorder=1)[1]
-        polygon = ax[:fill](x[:,2], x[:,1], color="#f713e0", zorder=1)[1]
-        ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
+        line = ax[:plot](x[:,1], x[:,2], ".-", zorder=10)[1]
+        polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
+
+        ax[:scatter](x[:,1], x[:,2], color="black", zorder=20)
         # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
         ax[:plot](x[:,1], x[:,2], color="black", lw=0.5)[1] # initial condition
 
-
+        ax[:quiver](coords.centro_x[1], coords.centro_x[2],
+                    [cos.(coords.centro_angle)], [sin.(coords.centro_angle)], zorder=1) # centrosome
+        ax[:fill](x[:,1], x[:,2], color="#32d600", zorder=5)[1] # centrosome visibily
 
         if F.circular_wall
             y = collect(linspace(-1, 1, 1000))
@@ -64,11 +70,16 @@ function init_plot(x::Matrix, P::CellSimCommon.Params, F::CellSimCommon.Flags)
 
         ax[:set_aspect]("equal", "datalim")
 
-        line = ax[:plot](x[:,2], x[:,1], ".-", zorder=1)[1]
-        polygon = ax[:fill](x[:,2], x[:,1], color="#f713e0", zorder=1)[1]
-        ax[:scatter](x[:,2], x[:,1], color="black", zorder=2)
+        line = ax[:plot](x[:,2], x[:,1], ".-", zorder=10)[1]
+        polygon = ax[:fill](x[:,2], x[:,1], color="#f713e0", zorder=10)[1]
+
+        ax[:scatter](x[:,2], x[:,1], color="black", zorder=20)
         # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
         ax[:plot](x[:,2], x[:,1], color="black", lw=0.5)[1] # initial condition
+
+        ax[:quiver](coords.centro_x[2], coords.centro_x[1],
+                    [sin.(coords.centro_angle)], [cos.(coords.centro_angle)], zorder=1) # centrosome
+        ax[:fill](x[:,2], x[:,1], color="#32d600", zorder=5)[1] # centrosome visibily
 
         if F.circular_wall
             y = collect(linspace(-1, 1, 1000))
@@ -106,7 +117,11 @@ function init_animation()
     return writer
 end
 
-function update_plot(x::Matrix, k::Int, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::Forces.Plotables)
+function update_plot(coords::Forces.PointCoords, k::Int, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::Forces.Plotables,
+                     vr::Centrosome.VisibleRegion)
+
+    x = coords.x
+
     ax = PyPlot.gca()
     if initializing
         prefix = "[INIT]"
@@ -123,6 +138,10 @@ function update_plot(x::Matrix, k::Int, P::CellSimCommon.Params, F::CellSimCommo
         lines[1][:set_data](x[:,1], x[:,2])
         patches[1][:set_xy](x)
 
+        scatters[2][:set_offsets](coords.centro_x) # centrosome
+        scatters[2][:set_UVC]([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
+        patches[2][:set_xy](vr.nodes[1:vr.n,:]) # visibility region
+
         # drag force
         scatters[1][:set_offsets](x[:,:])
 
@@ -133,7 +152,11 @@ function update_plot(x::Matrix, k::Int, P::CellSimCommon.Params, F::CellSimCommo
         # ax[:set_ylim]((x_mid-15, x_mid+15))
     else
         lines[1][:set_data](x[:,2], x[:,1])
-        patches[1][:set_xy]([x[:,2] x[:,1]])
+        patches[1][:set_xy]([x[:,2] x[:,1]]) # cell polygon
+
+        scatters[2][:set_offsets]([coords.centro_x[2]; coords.centro_x[1]]) # centrosome
+        scatters[2][:set_UVC]([sin.(coords.centro_angle)], [cos.(coords.centro_angle)])
+        patches[2][:set_xy]([vr.nodes[1:vr.n,2] vr.nodes[1:vr.n,1]]) # visibility region
 
         # drag force
         scatters[1][:set_offsets]([x[:,2] x[:,1]])
@@ -226,7 +249,8 @@ function main()
         y_params["drag_gauss_width"],
         y_params["mass_gauss_power"],
         y_params["mass_gauss_width"],
-        y_params["polar_shift"]
+        y_params["polar_shift"],
+        y_params["k_MT"]
    )
 
     println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
@@ -248,7 +272,8 @@ function main()
           y_flags["write_animation"],
           y_flags["landscape_plot"],
           y_flags["plot_drag"],
-          y_flags["circular_wall"]
+          y_flags["circular_wall"],
+          y_flags["centrosome_only"]
     )
 
     println(P)
@@ -261,14 +286,18 @@ function main()
     x_init = EvenParam.reparam(compute_initial_x(P, F; convex=true))
 
     x = copy(x_init)
-    fig = init_plot(x_init, P, F)
+
+    Forces.init_FD_matrices(P)
+    coords, coords_s = Forces.new_PointCoords(x, P)
+
+    fig = init_plot(coords, P, F)
     if F.write_animation
         writer = init_animation()
         writer[:setup](fig, string(writer[:metadata]["title"], ".mp4"), 100)
     end
 
-    Forces.init_FD_matrices(P)
-    coords, coords_s = Forces.new_PointCoords(x, P)
+    # centrosome buffers and coordinates
+    (centro_bufs, centro_vr, centro_qw, centro_pc) = Centrosome.init(P)
 
     resi, resi_J = Forces.wrap_residuals(coords, coords_s, P, F, plotables)
     if F.innerloop
@@ -296,17 +325,26 @@ function main()
             res = NLsolve.nlsolve(resi_solver, vec(x); method=:newton)
             x = reshape(res.zero, (P.N, 2))
         else
-            resi(vec(x), r_x)
-            resi_J(vec(x), Jr_x)
-            δx[:] = -(Jr_x\r_x)
-            x[:] = x[:] + δx
+            if !F.centrosome_only
+                # cortex evolution
+                resi(vec(x), r_x)
+                resi_J(vec(x), Jr_x)
+                δx[:] = -(Jr_x\r_x)
+                x[:] = x[:] + δx
+            else
+                # centrosome evolution
+                (centro_A, centro_b) = Centrosome.assemble_system(P, coords, centro_bufs, centro_vr, centro_qw, centro_pc)
+                centro_delta = centro_A\centro_b
+                coords.centro_x[:] += P.δt * centro_delta[1:2]
+                coords.centro_angle[:] += P.δt * centro_delta[3]
+            end
         end
 
 
         # plot
         plot_period = 10
         if F.plot & (k % plot_period == 0)
-            update_plot(x, k, P, F, false, plotables)
+            update_plot(coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
                 writer[:grab_frame]()
             end

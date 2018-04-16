@@ -41,7 +41,8 @@ struct PointCoords
     d2vd2τ::Vector{Float64}
 
     # centrosome
-    centro::Vector{Float64}
+    centro_x::Vector{Float64}
+    centro_angle::Vector{Float64}
 end
 
 
@@ -93,7 +94,10 @@ function new_PointCoords(N::Int64)
          zeros(2N), # dvΔL
          zeros(N), # vd2τ
          zeros(N), # d1vd2τ
-         zeros(N)) # d2vd2τ
+         zeros(N), # d2vd2τ
+
+         zeros(2), # centro_x
+         zeros(1)) # centro_angle
 
     coords_shifted = new_PointCoordsShifted(coords)
     return coords, coords_shifted
@@ -103,6 +107,7 @@ function new_PointCoords(x::Matrix{Float64}, P::Params)
     N = size(x, 1)
     coords, coords_shifted = new_PointCoords(N)
     update_coords(coords, P, x)
+    coords.centro_x[:] = sum(x, 1)/size(x,1)
     return coords, coords_shifted
 end
 

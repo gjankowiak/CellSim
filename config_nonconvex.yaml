@@ -33,6 +33,7 @@ params:
 
     polar_shift: 6.0
 
+    k_MT: 1.0
 
 flags:
     confine:              true
@@ -48,3 +49,4 @@ flags:
     landscape_plot:       false
     plot_drag:            true
     circular_wall:        true
+    centrosome_only:      true
