@@ -4,6 +4,7 @@ import CellSimCommon
 import Forces
 import Wall
 import Masks
+
 import Centrosome
 
 import Utils
@@ -36,16 +37,15 @@ function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellS
 
         ax[:set_aspect]("equal", "datalim")
 
-        line = ax[:plot](x[:,1], x[:,2], ".-", zorder=10)[1]
+        line = ax[:plot](x[:,1], x[:,2], ".-", zorder=20)[1]
         polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
 
-        ax[:scatter](x[:,1], x[:,2], color="black", zorder=20)
-        # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
-        ax[:plot](x[:,1], x[:,2], color="black", lw=0.5)[1] # initial condition
+        ax[:scatter](x[:,1], x[:,2], color="black", zorder=30)
+        ax[:plot](x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1] # initial condition
 
         ax[:quiver](coords.centro_x[1], coords.centro_x[2],
-                    [cos.(coords.centro_angle)], [sin.(coords.centro_angle)], zorder=1) # centrosome
-        ax[:fill](x[:,1], x[:,2], color="#32d600", zorder=5)[1] # centrosome visibily
+                    [cos.(coords.centro_angle)], [sin.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01) # centrosome
+        ax[:fill](x[:,1], x[:,2], color="#32d600", zorder=15)[1] # centrosome visibility
 
         if F.circular_wall
             y = collect(linspace(-1, 1, 1000))
@@ -70,16 +70,16 @@ function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellS
 
         ax[:set_aspect]("equal", "datalim")
 
-        line = ax[:plot](x[:,2], x[:,1], ".-", zorder=10)[1]
+        line = ax[:plot](x[:,2], x[:,1], ".-", zorder=20)[1]
         polygon = ax[:fill](x[:,2], x[:,1], color="#f713e0", zorder=10)[1]
 
-        ax[:scatter](x[:,2], x[:,1], color="black", zorder=20)
+        ax[:scatter](x[:,2], x[:,1], color="black", zorder=30)
         # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
         ax[:plot](x[:,2], x[:,1], color="black", lw=0.5)[1] # initial condition
 
         ax[:quiver](coords.centro_x[2], coords.centro_x[1],
-                    [sin.(coords.centro_angle)], [cos.(coords.centro_angle)], zorder=1) # centrosome
-        ax[:fill](x[:,2], x[:,1], color="#32d600", zorder=5)[1] # centrosome visibily
+                    [sin.(coords.centro_angle)], [cos.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01) # centrosome
+        ax[:fill](x[:,2], x[:,1], color="#32d600", zorder=15)[1] # centrosome visibily
 
         if F.circular_wall
             y = collect(linspace(-1, 1, 1000))
@@ -140,7 +140,7 @@ function update_plot(coords::Forces.PointCoords, k::Int, P::CellSimCommon.Params
 
         scatters[2][:set_offsets](coords.centro_x) # centrosome
         scatters[2][:set_UVC]([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
-        patches[2][:set_xy](vr.nodes[1:vr.n,:]) # visibility region
+        patches[2][:set_xy](vr.nodes[1:vr.n,:] .+ reshape(coords.centro_x, 1, 2)) # visibility region
 
         # drag force
         scatters[1][:set_offsets](x[:,:])
@@ -156,7 +156,7 @@ function update_plot(coords::Forces.PointCoords, k::Int, P::CellSimCommon.Params
 
         scatters[2][:set_offsets]([coords.centro_x[2]; coords.centro_x[1]]) # centrosome
         scatters[2][:set_UVC]([sin.(coords.centro_angle)], [cos.(coords.centro_angle)])
-        patches[2][:set_xy]([vr.nodes[1:vr.n,2] vr.nodes[1:vr.n,1]]) # visibility region
+        patches[2][:set_xy]([vr.nodes[1:vr.n,2]+coords.centro_x[2] vr.nodes[1:vr.n,1]+coords.centro_x[1]]) # visibility region
 
         # drag force
         scatters[1][:set_offsets]([x[:,2] x[:,1]])
@@ -325,19 +325,17 @@ function main()
             res = NLsolve.nlsolve(resi_solver, vec(x); method=:newton)
             x = reshape(res.zero, (P.N, 2))
         else
-            if !F.centrosome_only
-                # cortex evolution
-                resi(vec(x), r_x)
-                resi_J(vec(x), Jr_x)
-                δx[:] = -(Jr_x\r_x)
-                x[:] = x[:] + δx
-            else
-                # centrosome evolution
-                (centro_A, centro_b) = Centrosome.assemble_system(P, coords, centro_bufs, centro_vr, centro_qw, centro_pc)
-                centro_delta = centro_A\centro_b
-                coords.centro_x[:] += P.δt * centro_delta[1:2]
-                coords.centro_angle[:] += P.δt * centro_delta[3]
-            end
+            # cortex evolution
+            resi(vec(x), r_x)
+            resi_J(vec(x), Jr_x)
+            δx[:] = -(Jr_x\r_x)
+            x[:] = x[:] + δx
+
+            # centrosome evolution
+            (centro_A, centro_b) = Centrosome.assemble_system(P, coords, centro_bufs, centro_vr, centro_qw, centro_pc)
+            centro_delta = centro_A\centro_b
+            coords.centro_x[:] += P.δt * centro_delta[1:2]
+            coords.centro_angle[:] += P.δt * centro_delta[3]
         end
 
 
