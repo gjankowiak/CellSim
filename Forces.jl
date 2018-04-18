@@ -57,15 +57,6 @@ struct PointCoordsShifted
     v_p::SubArray
 end
 
-struct Plotables
-    field::Vector{Float64}
-    ∇field::Matrix{Float64}
-    transport_force::Matrix{Float64}
-    drag_force::Matrix{Float64}
-    mass_source::Vector{Float64}
-    mass_source_int::Vector{Float64}
-end
-
 mutable struct Differentials
     Dτ::SparseMatrixCSC{Float64}
     Dτc::SparseMatrixCSC{Float64}
@@ -171,17 +162,6 @@ function update_coords(coords::PointCoords, P::Params, x::Matrix{Float64})
     coords.vd2τ[:] = CellSimCommon.@dotprod(coords.vc, coords.d2τ)
     coords.d1vd2τ[:] = D1c_short*coords.vd2τ
     coords.d2vd2τ[:] = D2_short*coords.vd2τ
-end
-
-function new_plotables(N::Int64)
-    return Plotables(
-        zeros(N),  # field
-        zeros(N,2), # ∇field
-        zeros(N,2), # transport_force
-        zeros(N,2), # drag_force
-        zeros(N),   # mass_source
-        zeros(N),   # mass_source_int
-       )
 end
 
 function init_FD_matrices(P::Params)
@@ -296,7 +276,7 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
 end
 
 function compute_confinement_force(coords::PointCoords,
-                                   P::Params, F::Flags, plotables::Plotables,
+                                   P::Params, F::Flags, plotables::CellSimCommon.Plotables,
                                    dst_f::Vector{Float64},
                                    add::Bool=false, weighted::Bool=false)
     field, ∇field, H_field = Wall.compute_field(coords.x, P, F; gradient=true, hessian=false)
@@ -404,7 +384,7 @@ function compute_mask(coords::PointCoords, P::Params, F::Flags, half_w::Float64,
 end
 
 function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
-                                 P::Params, F::Flags, plt::Plotables,
+                                 P::Params, F::Flags, plt::CellSimCommon.Plotables,
                                  dst_f::Vector{Float64},
                                  add::Bool=false)
 
@@ -431,7 +411,7 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
 end
 
 function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
-                                 P::Params, F::Flags, plt::Plotables,
+                                 P::Params, F::Flags, plt::CellSimCommon.Plotables,
                                  diffs::Differentials,
                                  dst_Df::SparseMatrixCSC{Float64},
                                  add::Bool=false)
@@ -462,7 +442,7 @@ end
 function compute_residuals(x::Vector{Float64},
                            coords::PointCoords, coords_s::PointCoordsShifted,
                            inner_coords::PointCoords, inner_coords_s::PointCoordsShifted,
-                           P::Params, F::Flags, plotables::Plotables,
+                           P::Params, F::Flags, plotables::CellSimCommon.Plotables,
                            dst::Vector{Float64})
 
     update_coords(inner_coords, P, reshape(x, (P.N, 2)))
@@ -490,7 +470,7 @@ end
 function compute_residuals_J(x::Vector{Float64},
                              coords::PointCoords, coords_s::PointCoordsShifted,
                              inner_coords::PointCoords, inner_coords_s::PointCoordsShifted,
-                             P::Params, F::Flags, plotables::Plotables,
+                             P::Params, F::Flags, plotables::CellSimCommon.Plotables,
                              dst_Df::SparseMatrixCSC{Float64})
 
     update_coords(inner_coords, P, reshape(x, (P.N, 2)))
@@ -518,7 +498,7 @@ function compute_residuals_J(x::Vector{Float64},
 end
 
 function wrap_residuals(coords::PointCoords, coords_s::PointCoordsShifted,
-                        P::Params, F::Flags, plotables::Plotables)
+                        P::Params, F::Flags, plotables::CellSimCommon.Plotables)
     inner_coords = deepcopy(coords)
     inner_coords_s = new_PointCoordsShifted(inner_coords)
     resi(x::Vector{Float64}, dst::Vector{Float64}) =

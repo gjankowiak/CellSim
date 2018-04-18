@@ -38,14 +38,14 @@ params:
 flags:
     confine:              true
     adjust_drag:          false
-    polymerize:           true
+    polymerize:           false
     dryrun:               true
     plot:                 true
     pretty:               false
     continuous:           true
     innerloop:            false
     weighted_confinement: true
-    write_animation:      false
+    write_animation:      true
     landscape_plot:       false
     plot_drag:            true
     circular_wall:        true

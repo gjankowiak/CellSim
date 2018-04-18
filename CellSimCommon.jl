@@ -48,20 +48,53 @@ immutable Params
 end
 
 immutable Flags
+    # model options
     confine::Bool
     adjust_drag::Bool
     polymerize::Bool
-    dryrun::Bool
+    continuous::Bool
+    circular_wall::Bool
+    cortex::Bool
+    centrosome::Bool
+    weighted_confinement::Bool
+
+    # scheme/solver options
+    innerloop::Bool
+
+    # visualization options
     plot::Bool
     pretty::Bool
-    continuous::Bool
-    innerloop::Bool
-    weighted_confinement::Bool
-    write_animation::Bool
     landscape_plot::Bool
+    follow_cam::Bool
     plot_drag::Bool
-    circular_wall::Bool
-    centrosome_only::Bool
+
+    # output options
+    dryrun::Bool
+    write_animation::Bool
+end
+
+struct Plotables
+    field::Vector{Float64}
+    ∇field::Matrix{Float64}
+    transport_force::Matrix{Float64}
+    drag_force::Matrix{Float64}
+    mass_source::Vector{Float64}
+    mass_source_int::Vector{Float64}
+    mt_force::Vector{Float64}
+    mt_force_indiv::Matrix{Float64}
+end
+
+function new_plotables(N::Int64)
+    return Plotables(
+        zeros(N),  # field
+        zeros(N,2), # ∇field
+        zeros(N,2), # transport_force
+        zeros(N,2), # drag_force
+        zeros(N),   # mass_source
+        zeros(N),   # mass_source_int
+        zeros(2),   # mt_force
+        zeros(N+1,2),# mt_force_indiv
+       )
 end
 
 immutable Metrics
