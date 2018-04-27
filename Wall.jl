@@ -87,13 +87,13 @@ function compute_walls(y::Vector, P::Params, F::Flags, levelset::Float64=0.0; ri
         if F.circular_wall
             return inv_polar_projection([(1-2*right)*(-P.f_β*pulse-P.f_width)+P.polar_shift y], P)
         else
-            return [(1-2*right)*(-P.f_β*pulse-P.f_width)+P.polar_shift y]
+            return [(1-2*right)*(-P.f_β*pulse-P.f_width) y]
         end
     else
         if F.circular_wall
             return inv_polar_projection([(1-2*right)*(-P.f_β*pulse-P.f_width+1/α)+P.polar_shift y], P)
         else
-            return [(1-2*right)*(-P.f_β*pulse-P.f_width+1/α)+P.polar_shift y]
+            return [(1-2*right)*(-P.f_β*pulse-P.f_width+1/α) y]
         end
     end
 end
@@ -146,11 +146,7 @@ function compute_field(x::Matrix, P::Params, F::Flags; gradient::Bool=true, hess
             return prefac*f, prefac*∇f, prefac*spzeros(2N, 2N)
         end
     end
-    if weighted
-        return prefac*f, Matrix(0, 0), spzeros(2N, 2N)
-    else
-        return prefac*f, Matrix(0, 0), spzeros(2N, 2N)
-    end
+    return prefac*f, Matrix(0, 0), spzeros(2N, 2N)
 end
 
 function check_OOB(x::Matrix, P::Dict{String,Float64})
