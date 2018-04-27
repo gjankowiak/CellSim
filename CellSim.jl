@@ -43,16 +43,18 @@ function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellS
         ax[:scatter](x[:,1], x[:,2], color="black", zorder=30)
         ax[:plot](x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1] # initial condition
 
-        ax[:quiver](coords.centro_x[1], coords.centro_x[2],
-                    [cos.(coords.centro_angle)], [sin.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01, color="#12b600") # centrosome
-        ax[:fill](x[:,1], x[:,2], color="#32d600", zorder=15)[1] # centrosome visibility
-        ax[:quiver](coords.centro_x[1], coords.centro_x[2],
-                    [0], [0], zorder=100, units="xy", scale=1e-2, width=0.01) # MT force
+        if F.centrosome
+            ax[:quiver](coords.centro_x[1], coords.centro_x[2],
+                        [cos.(coords.centro_angle)], [sin.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01, color="#12b600") # centrosome
+            ax[:fill](x[:,1], x[:,2], color="#32d600", zorder=15)[1] # centrosome visibility
+            ax[:quiver](coords.centro_x[1], coords.centro_x[2],
+                        [0], [0], zorder=100, units="xy", scale=1e-2, width=0.01) # MT force
 
-        ax[:quiver]([0.0], [0.0], [0], [0], zorder=100, units="xy", scale=5, width=0.001) # MT force
+            ax[:quiver]([0.0], [0.0], [0], [0], zorder=100, units="xy", scale=5, width=0.001) # MT force
 
-        mt_circle = PyPlot.matplotlib[:patches][:Circle]((coords.centro_x[1], coords.centro_x[2]), Centrosome.MT_RADIUS, zorder=110, alpha=0.5)
-        ax[:add_artist](mt_circle)
+            mt_circle = PyPlot.matplotlib[:patches][:Circle]((coords.centro_x[1], coords.centro_x[2]), Centrosome.MT_RADIUS, zorder=110, alpha=0.5)
+            ax[:add_artist](mt_circle)
+        end
 
         if F.circular_wall
             y = collect(linspace(-1, 1, 1000))
@@ -68,7 +70,7 @@ function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellS
             wall = Wall.compute_walls(y, P, F)
             ax[:plot](wall[:,1], wall[:,2], -wall[:,1], wall[:,2], color="black", lw=0.5)
             levelset = Wall.compute_walls(y, P, F, 2e-4)
-            ax[:plot](levelset[:,1], levelset[:,2], -levelset[:,1], levelset[:,1], color="red", lw=0.5)
+            ax[:plot](levelset[:,1], levelset[:,2], -levelset[:,1], levelset[:,2], color="red", lw=0.5)
         end
 
         ax[:axvline](0)
@@ -84,16 +86,18 @@ function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellS
         # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
         ax[:plot](x[:,2], x[:,1], color="black", lw=0.5)[1] # initial condition
 
-        ax[:quiver](coords.centro_x[2], coords.centro_x[1],
-                    [sin.(coords.centro_angle)], [cos.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01, color="#12b600") # centrosome
-        ax[:fill](x[:,2], x[:,1], color="#32d600", zorder=15)[1] # centrosome visibily
-        ax[:quiver](coords.centro_x[2], coords.centro_x[1],
-                    [0], [0], zorder=100, units="xy", scale=10, width=0.01) # MT force
+        if F.centrosome
+            ax[:quiver](coords.centro_x[2], coords.centro_x[1],
+                        [sin.(coords.centro_angle)], [cos.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01, color="#12b600") # centrosome
+            ax[:fill](x[:,2], x[:,1], color="#32d600", zorder=15)[1] # centrosome visibility
+            ax[:quiver](coords.centro_x[2], coords.centro_x[1],
+                        [0], [0], zorder=100, units="xy", scale=1e-2, width=0.01) # MT force
 
-        ax[:quiver]([0.0], [0.0], [0], [0], zorder=100, units="xy", scale=10, width=0.01) # MT force
+            ax[:quiver]([0.0], [0.0], [0], [0], zorder=100, units="xy", scale=5, width=0.001) # MT force
 
-        mt_circle = PyPlot.matplotlib[:patches][:Circle]((coords.centro_x[2], coords.centro_x[1]), Centrosome.MT_RADIUS, zorder=110, alpha=0.5)
-        ax[:add_artist](mt_circle)
+            mt_circle = PyPlot.matplotlib[:patches][:Circle]((coords.centro_x[2], coords.centro_x[1]), Centrosome.MT_RADIUS, zorder=110, alpha=0.5)
+            ax[:add_artist](mt_circle)
+        end
 
         if F.circular_wall
             y = collect(linspace(-1, 1, 1000))
@@ -169,17 +173,19 @@ function update_plot(coords::Forces.PointCoords, k::Int, P::CellSimCommon.Params
         lines[1][:set_data](x[:,1], x[:,2])
         patches[1][:set_xy](x)
 
-        scatters[2][:set_offsets](coords.centro_x) # centrosome
-        scatters[2][:set_UVC]([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
-        patches[2][:set_xy](vr.nodes[1:vr.n,:] .+ reshape(coords.centro_x, 1, 2)) # visibility region
+        if F.centrosome
+            scatters[2][:set_offsets](coords.centro_x) # centrosome
+            scatters[2][:set_UVC]([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
+            patches[2][:set_xy](vr.nodes[1:vr.n,:] .+ reshape(coords.centro_x, 1, 2)) # visibility region
 
-        scatters[3][:set_offsets](coords.centro_x) # centrosome
-        scatters[3][:set_UVC]([plotables.mt_force[1]], [plotables.mt_force[2]])
+            scatters[3][:set_offsets](coords.centro_x) # centrosome
+            scatters[3][:set_UVC]([plotables.mt_force[1]], [plotables.mt_force[2]])
 
-        scatters[4][:set_offsets](vr.nodes[1:vr.n,:].+reshape(coords.centro_x, 1, 2)) # MT force
-        scatters[4][:set_UVC]([plotables.mt_force_indiv[1:vr.n,1]], plotables.mt_force_indiv[1:vr.n,2])
+            scatters[4][:set_offsets](vr.nodes[1:vr.n,:].+reshape(coords.centro_x, 1, 2)) # MT force
+            scatters[4][:set_UVC]([plotables.mt_force_indiv[1:vr.n,1]], plotables.mt_force_indiv[1:vr.n,2])
 
-        artists[1][:center] = (coords.centro_x[1], coords.centro_x[2])
+            artists[1][:center] = (coords.centro_x[1], coords.centro_x[2])
+        end
 
         # drag force
         scatters[1][:set_offsets](x[:,:])
@@ -193,17 +199,19 @@ function update_plot(coords::Forces.PointCoords, k::Int, P::CellSimCommon.Params
         lines[1][:set_data](x[:,2], x[:,1])
         patches[1][:set_xy]([x[:,2] x[:,1]]) # cell polygon
 
-        scatters[2][:set_offsets]([coords.centro_x[2]; coords.centro_x[1]]) # centrosome
-        scatters[2][:set_UVC]([sin.(coords.centro_angle)], [cos.(coords.centro_angle)])
-        patches[2][:set_xy]([vr.nodes[1:vr.n,2]+coords.centro_x[2] vr.nodes[1:vr.n,1]+coords.centro_x[1]]) # visibility region
+        if F.centrosome
+            scatters[2][:set_offsets]([coords.centro_x[2]; coords.centro_x[1]]) # centrosome
+            scatters[2][:set_UVC]([sin.(coords.centro_angle)], [cos.(coords.centro_angle)])
+            patches[2][:set_xy]([vr.nodes[1:vr.n,2]+coords.centro_x[2] vr.nodes[1:vr.n,1]+coords.centro_x[1]]) # visibility region
 
-        scatters[3][:set_offsets]([coords.centro_x[2]], [coords.centro_x[1]]) # MT force
-        scatters[3][:set_UVC]([plotables.mt_force[2]], [plotables.mt_force[1]])
+            scatters[3][:set_offsets]([coords.centro_x[2]], [coords.centro_x[1]]) # MT force
+            scatters[3][:set_UVC]([plotables.mt_force[2]], [plotables.mt_force[1]])
 
-        scatters[4][:set_offsets]([vr.nodes[1:vr.n,2]+coords.centro_x[2] vr.nodes[1:vr.n,1]+coords.centro_x[1]]) # MT force
-        scatters[4][:set_UVC]([plotables.mt_force_indiv[1:vr.n,2]], plotables.mt_force_indiv[1:vr.n,1])
+            scatters[4][:set_offsets]([vr.nodes[1:vr.n,2]+coords.centro_x[2] vr.nodes[1:vr.n,1]+coords.centro_x[1]]) # MT force
+            scatters[4][:set_UVC]([plotables.mt_force_indiv[1:vr.n,2]], plotables.mt_force_indiv[1:vr.n,1])
 
-        artists[1][:center] = (coords.centro_x[2], coords.centro_x[1])
+            artists[1][:center] = (coords.centro_x[2], coords.centro_x[1])
+        end
 
         # drag force
         scatters[1][:set_offsets]([x[:,2] x[:,1]])
@@ -222,7 +230,7 @@ function update_plot(coords::Forces.PointCoords, k::Int, P::CellSimCommon.Params
         x_span = (x_max-x_min)
         y_min, y_max = minimum(x[:,2]), maximum(x[:,2])
         y_mid = 0.5(y_max+y_min)
-        y_span = (y_max+y_min)
+        y_span = (y_max-y_min)
 
         if !F.landscape_plot
             ax[:set_xlim]((x_mid-x_span, x_mid+x_span))
@@ -420,7 +428,7 @@ function main()
     # outer loop
     while k < P.M
         k += 1
-        # println("iteration #", k)
+        println("iteration #", k)
 
         # inner loop
         if k > 1
@@ -431,7 +439,7 @@ function main()
             res = NLsolve.nlsolve(resi_solver, vec(x); method=:newton)
             x = reshape(res.zero, (P.N, 2))
         else
-            if !F.cortex
+            if F.cortex
                 # cortex evolution
                 resi(vec(x), r_x)
                 resi_J(vec(x), Jr_x)
