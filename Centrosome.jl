@@ -153,19 +153,19 @@ end
 function compute_mt_longi_force(vr::VisibleRegion, plotables::CellSimCommon.Plotables)
 
     # pushing upto MT_RADIUS and the pulling
-    p = 0.0
-    k = 5e0
-    plotables.mt_force_indiv[:] = k*vr.nodes.*sign.(CellSimCommon.@entry_norm(vr.nodes)-MT_RADIUS).*abs.(CellSimCommon.@entry_norm(vr.nodes)-MT_RADIUS).^p
+    # p = 1.0
+    # k = 5e0
+    # plotables.mt_force_indiv[:] = k*vr.nodes./CellSimCommon.@entry_norm(vr.nodes).*sign.(CellSimCommon.@entry_norm(vr.nodes)-MT_RADIUS).*abs.(CellSimCommon.@entry_norm(vr.nodes)-MT_RADIUS).^p
 
     # pulling
-    # p = 0.0
-    # k = 5e0
-    # plotables.mt_force_indiv[:] = k*vr.nodes.*CellSimCommon.@entry_norm(vr.nodes).^p
+    #p = 0.0
+    #k = 5e0
+    #plotables.mt_force_indiv[:] = k*vr.nodes.*CellSimCommon.@entry_norm(vr.nodes).^p
 
     # pushing
-    # p = -1
-    # k = 5e0
-    # plotables.mt_force_indiv[:] = -k*vr.nodes.*abs.(CellSimCommon.@entry_norm(vr.nodes)-MT_RADIUS).^p
+    p = -1
+    k = 1e0
+    plotables.mt_force_indiv[1:vr.n,:] = -k*vr.nodes[1:vr.n,:].*abs.(CellSimCommon.@entry_norm(vr.nodes[1:vr.n,:])).^p
 end
 
 function integrate_θ(f::Array{Float64}, qw::QuadratureWeights, vr::VisibleRegion)
@@ -189,17 +189,23 @@ function assemble_system(P::CellSimCommon.Params, coords::PointCoords, bufs::Vis
     A = 2π*eye(3)
 
     # maybe wrap this into a function
-    @views A[3,3] = CellSimCommon.nansum(@. (pc.θ_p[1:n] - pc.θ[1:n])*(
-                                                1/(qw.a[1:n]^2 * cot(pc.θ[vr.idx_p]) + qw.a[1:n]*qw.b[1:n])
-                                                -1/(qw.a[1:n]^2 * cot(pc.θ[1:n]) + qw.a[1:n]*qw.b[1:n])))
+    #= compute using analytical formula
+    @views A[3,3] = CellSimCommon.nansum(@. ( 1/(qw.a[1:n]^2 * cot(pc.θ[vr.idx_p]) + qw.a[1:n]*qw.b[1:n])
+                                             -1/(qw.a[1:n]^2 * cot(pc.θ[1:n]) + qw.a[1:n]*qw.b[1:n])))
 
-    @views A[1,3] = CellSimCommon.nansum(@. (pc.θ_p[1:n] - pc.θ[1:n])/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
-                                            (qw.a[1:n]*log(pc.r[vr.idx_p]) - qw.b[1:n]*pc.θ[vr.idx_p])
-                                            -(qw.a[1:n]*log(pc.r[1:n]) + qw.b[1:n]*pc.θ[1:n])))
+    @views A[1,3] = CellSimCommon.nansum(@. 1/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
+                                             (qw.a[1:n]*log(pc.r[vr.idx_p]) - qw.b[1:n]*pc.θ[vr.idx_p])
+                                            -(qw.a[1:n]*log(pc.r[1:n])      + qw.b[1:n]*pc.θ[1:n])))
 
-    @views A[2,3] = CellSimCommon.nansum(@. (pc.θ_p[1:n] - pc.θ[1:n])/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
-                                            (qw.b[1:n]*log(pc.r[vr.idx_p]) + qw.a[1:n]*pc.θ[vr.idx_p])
-                                            -(qw.b[1:n]*log(pc.r[1:n]) - qw.a[1:n]*pc.θ[1:n])))
+    @views A[2,3] = CellSimCommon.nansum(@. 1/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
+                                             (qw.b[1:n]*log(pc.r[vr.idx_p]) + qw.a[1:n]*pc.θ[vr.idx_p])
+                                            -(qw.b[1:n]*log(pc.r[1:n])      - qw.a[1:n]*pc.θ[1:n])))
+    =#
+
+    #= compute using quadrature =#
+    @views A[3,3] = integrate_θ(pc.r[1:n].^2, qw, vr)[1]
+    @views A[1:2,3] = integrate_θ([-vr.nodes[1:n,2] vr.nodes[1:n,1]], qw, vr)
+
     A[3,1] = A[1,3]
     A[3,2] = A[2,3]
     A *= -P.k_MT
@@ -209,6 +215,9 @@ function assemble_system(P::CellSimCommon.Params, coords::PointCoords, bufs::Vis
     compute_mt_longi_force(vr, plotables)
 
     b[1:2] = integrate_θ(plotables.mt_force_indiv, qw, vr)
+
+    # DEBUG, needs calibration
+    #plotables.mt_force_indiv[1:vr.n,:] .*= 1e3*qw.A1[1:vr.n,:]
 
     return A, b
 end
