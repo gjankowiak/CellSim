@@ -38,15 +38,17 @@ params:
 flags:
     confine:              true
     adjust_drag:          false
-    polymerize:           false
+    polymerize:           true
     dryrun:               true
     plot:                 true
     pretty:               false
     continuous:           true
     innerloop:            false
     weighted_confinement: true
-    write_animation:      true
+    write_animation:      false
     landscape_plot:       false
     plot_drag:            true
     circular_wall:        true
-    centrosome_only:      true
+    cortex:               true
+    centrosome:           false
+    follow_cam:           false
