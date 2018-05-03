@@ -135,17 +135,24 @@ function main()
     plotables = CellSimCommon.new_plotables(P.N)
 
     if haskey(yaml_config, "load_state") && yaml_config["load_state"]["do_load"]
-        x_init = readcsv(yaml_config["load_state"]["filename"])
-        x_init .-= sum(x_init, 1)/size(x_init, 1)
-        x_init[:,1] *= P.x0_a/abs(maximum(x_init[:,1]))
-        x_init[:,2] *= P.x0_b/abs(maximum(x_init[:,2]))
-
-        if F.circular_wall
-            x_init[:,1] += P.polar_shift
+        load_state = yaml_config["load_state"]
+        x_init = readcsv(load_state["filename"])
+        if load_state["do_recenter"]
+            x_init .-= sum(x_init, 1)/size(x_init, 1)
+            x_init[:,1] *= P.x0_a/abs(maximum(x_init[:,1]))
+            x_init[:,2] *= P.x0_b/abs(maximum(x_init[:,2]))
         end
-        x_init = EvenParam.reparam(x_init, true, P.N)
-        println("[info] reversing initial condition")
+
+        # if F.circular_wall
+            # x_init[:,1] += P.polar_shift
+        # end
+
+        if load_state["do_resample"]
+            x_init = EvenParam.reparam(x_init, true, P.N)
+        end
+
         if !Utils.check_ccw_polygon(x_init)
+            println("[info] reversing initial condition")
             @views begin
                 reverse!(x_init[:,1])
                 reverse!(x_init[:,2])
@@ -194,7 +201,7 @@ function main()
     # outer loop
     while k < P.M
         k += 1
-        println("iteration #", k)
+        # println("iteration #", k)
 
         # inner loop
         if k > 1
@@ -237,6 +244,7 @@ function main()
             long_speed = (height - prev_height) / (plot_period*P.δt)
             prev_height = height
             # println("Long. speed: ", long_speed)
+            writecsv("/scratch/scratch/.last_x", coords.x)
         end
 
         l2_norm = sqrt(sum(abs2, x))

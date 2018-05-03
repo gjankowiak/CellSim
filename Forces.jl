@@ -216,19 +216,28 @@ end
 
 function compute_front_back(coords::PointCoords, P::Params, F::Flags)
     if !F.circular_wall
-        x_min, x_min_idx = findmin(coords.x[:,2])
-        x_max, x_max_idx = findmax(coords.x[:,2])
-        return ((x_min, x_min_idx), (x_max, x_max_idx))
+        barycenter = sum(coords.x, 1)/P.N
+        α = angle.(coords.x[:,1]-barycenter[1] + (coords.x[:,2]-barycenter[2])*im)
+
+        x_back, x_back_idx = findmin(abs.(α + π/2))
+        x_front, x_front_idx = findmin(abs.(α - π/2))
+
+        x_back = coords.x[x_back_idx,2]
+        x_front = coords.x[x_front_idx,2]
+
+        # top/bottom
+        # x_back, x_back_idx = findmin(coords.x[:,2])
+        # x_front, x_front_idx = findmax(coords.x[:,2])
     else
         ang = angle.(complex(coords.x[:,1] + coords.x[:,2]im))
-        x_min, x_min_idx = findmin(ang)
-        x_max, x_max_idx = findmax(ang)
-        if (x_max - x_min) > pi
-            x_min, x_max = x_max, x_min
-            x_min_idx, x_max_idx = x_max_idx, x_min_idx
+        x_back, x_back_idx = findmin(ang)
+        x_front, x_front_idx = findmax(ang)
+        if (x_front - x_back) > pi
+            x_back, x_front = x_front, x_back
+            x_back_idx, x_front_idx = x_front_idx, x_back_idx
         end
-        return ((x_min, x_min_idx), (x_max, x_max_idx))
     end
+    return ((x_back, x_back_idx), (x_front, x_front_idx))
 end
 
 function compute_pressure_force(coords::PointCoords, P::Params,

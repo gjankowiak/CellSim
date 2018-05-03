@@ -27,8 +27,11 @@ function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellS
         line = ax[:plot](x[:,1], x[:,2], ".-", zorder=20)[1]
         polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
 
-        ax[:scatter](x[:,1], x[:,2], color="black", zorder=30)
+        ax[:scatter](x[:,1], x[:,2], color="black", zorder=30) # ?
         ax[:plot](x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1] # initial condition
+
+        ax[:quiver](coords.x[1], coords.x[2],
+                    zeros(size(x,1)), zeros(size(x,1)), zorder=100, units="xy", scale=30, width=0.001, color="blue") # transport force
 
         if F.centrosome
             ax[:quiver](coords.centro_x[1], coords.centro_x[2],
@@ -59,6 +62,8 @@ function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellS
             levelset = Wall.compute_walls(y, P, F, 2e-4)
             ax[:plot](levelset[:,1], levelset[:,2], -levelset[:,1], levelset[:,2], color="red", lw=0.5)
         end
+
+        ax[:scatter](x[:,1], x[:,2], color="red")
 
         ax[:axvline](0)
     else
@@ -148,57 +153,85 @@ function update_plot(coords::Forces.PointCoords, k::Int, P::CellSimCommon.Params
     patches = ax[:patches]
     artists = ax[:artists]
 
+    idx_l = idx_s = idx_p = idx_a = 1
+
     if !F.landscape_plot
-        lines[1][:set_data](x[:,1], x[:,2])
-        patches[1][:set_xy](x)
+        lines[idx_l][:set_data](x[:,1], x[:,2])
+        idx_l += 1
+
+        patches[idx_p][:set_xy](x)
+        idx_p += 1
+
+        scatters[idx_s][:set_offsets](x)
+        idx_s += 1
+
+        scatters[idx_s][:set_offsets](x)
+        scatters[idx_s][:set_UVC](plotables.transport_force[:,1], plotables.transport_force[:,2])
+        idx_s += 1
 
         if F.centrosome
-            scatters[2][:set_offsets](coords.centro_x) # centrosome
-            scatters[2][:set_UVC]([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
-            patches[2][:set_xy](vr.nodes[1:vr.n,:] .+ reshape(coords.centro_x, 1, 2)) # visibility region
+            scatters[idx_s][:set_offsets](coords.centro_x) # centrosome
+            scatters[idx_s][:set_UVC]([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
+            idx_s += 1
 
-            scatters[3][:set_offsets](coords.centro_x) # centrosome
-            scatters[3][:set_UVC]([plotables.mt_force[1]], [plotables.mt_force[2]])
+            patches[idx_p][:set_xy](vr.nodes[1:vr.n,:] .+ reshape(coords.centro_x, 1, 2)) # visibility region
+            idx_p += 1
 
-            scatters[4][:set_offsets](vr.nodes[1:vr.n,:].+reshape(coords.centro_x, 1, 2)) # MT force
-            scatters[4][:set_UVC]([plotables.mt_force_indiv[1:vr.n,1]], plotables.mt_force_indiv[1:vr.n,2])
+            scatters[idx_s][:set_offsets](coords.centro_x) # centrosome
+            scatters[idx_s][:set_UVC]([plotables.mt_force[1]], [plotables.mt_force[2]])
+            idx_s += 1
 
-            artists[1][:center] = (coords.centro_x[1], coords.centro_x[2])
+            scatters[idx_s][:set_offsets](vr.nodes[1:vr.n,:].+reshape(coords.centro_x, 1, 2)) # MT force
+            scatters[idx_s][:set_UVC]([plotables.mt_force_indiv[1:vr.n,1]], plotables.mt_force_indiv[1:vr.n,2])
+            idx_s += 1
+
+            artists[idx_a][:center] = (coords.centro_x[1], coords.centro_x[2])
+            idx_a += 1
         end
 
-        # drag force
-        scatters[1][:set_offsets](x[:,:])
+        scatters[idx_s][:set_offsets](x)
+        scatters[idx_s][:set_sizes](1e4*plotables.mass_source)
+        colors = Array{String}(size(x, 1))
+        fill!(colors, "red")
+        x_max, x_max_idx = findmax(x[:,2])
+        colors[x_max_idx] = "yellow"
+        scatters[idx_s][:set_color](colors)
+        idx_s += 1
 
         lims = ax[:get_ylim]()
 
         x_min, x_max = minimum(x[:,2]), maximum(x[:,2])
         x_mid = 0.5(x_max+x_min)
-        # ax[:set_ylim]((x_mid-15, x_mid+15))
     else
-        lines[1][:set_data](x[:,2], x[:,1])
-        patches[1][:set_xy]([x[:,2] x[:,1]]) # cell polygon
+        lines[idx_l][:set_data](x[:,2], x[:,1])
+        idx_l += 1
+
+        patches[idx_p][:set_xy]([x[:,2] x[:,1]]) # cell polygon
+        idx_p += 1
 
         if F.centrosome
-            scatters[2][:set_offsets]([coords.centro_x[2]; coords.centro_x[1]]) # centrosome
-            scatters[2][:set_UVC]([sin.(coords.centro_angle)], [cos.(coords.centro_angle)])
-            patches[2][:set_xy]([vr.nodes[1:vr.n,2]+coords.centro_x[2] vr.nodes[1:vr.n,1]+coords.centro_x[1]]) # visibility region
+            scatters[idx_s][:set_offsets]([coords.centro_x[2]; coords.centro_x[1]]) # centrosome
+            scatters[idx_s][:set_UVC]([sin.(coords.centro_angle)], [cos.(coords.centro_angle)])
+            idx_s += 1
 
-            scatters[3][:set_offsets]([coords.centro_x[2]], [coords.centro_x[1]]) # MT force
-            scatters[3][:set_UVC]([plotables.mt_force[2]], [plotables.mt_force[1]])
+            patches[idx_p][:set_xy]([vr.nodes[1:vr.n,2]+coords.centro_x[2] vr.nodes[1:vr.n,1]+coords.centro_x[1]]) # visibility region
+            idx_p += 1
 
-            scatters[4][:set_offsets]([vr.nodes[1:vr.n,2]+coords.centro_x[2] vr.nodes[1:vr.n,1]+coords.centro_x[1]]) # MT force
-            scatters[4][:set_UVC]([plotables.mt_force_indiv[1:vr.n,2]], plotables.mt_force_indiv[1:vr.n,1])
+            scatters[idx_s][:set_offsets]([coords.centro_x[2]], [coords.centro_x[1]]) # MT force
+            scatters[idx_s][:set_UVC]([plotables.mt_force[2]], [plotables.mt_force[1]])
+            idx_s += 1
 
-            artists[1][:center] = (coords.centro_x[2], coords.centro_x[1])
+            scatters[idx_s][:set_offsets]([vr.nodes[1:vr.n,2]+coords.centro_x[2] vr.nodes[1:vr.n,1]+coords.centro_x[1]]) # MT force
+            scatters[idx_s][:set_UVC]([plotables.mt_force_indiv[1:vr.n,2]], plotables.mt_force_indiv[1:vr.n,1])
+            idx_s += 1
+
+            artists[idx_a][:center] = (coords.centro_x[2], coords.centro_x[1])
+            idx_a += 1
         end
-
-        # drag force
-        scatters[1][:set_offsets]([x[:,2] x[:,1]])
 
         lims = ax[:get_xlim]()
         x_min, x_max = minimum(x[:,2]), maximum(x[:,2])
         x_mid = 0.5(x_max+x_min)
-        # ax[:set_xlim]((x_mid-15, x_mid+15))
     end
 
 

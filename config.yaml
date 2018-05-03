@@ -1,5 +1,5 @@
 params:
-    N: 150 # number of points
+    N: 250 # number of points
     M: 10000 # max. number of iterations
 
     δt: 2e-4 # time step
@@ -8,10 +8,10 @@ params:
     K: 2*5e-2 # membrane elasticity
     Ka: 1 # cortex viscosity
 
-    c: 6.5*8e-1 # polymerization speed
+    c: 5.5*8e-1 # polymerization speed
 
-    x0_a: 0.4 # initial ellipsis width
-    x0_b: 0.2 # initial ellipsis height
+    x0_a: 0.3 # initial ellipsis width
+    x0_b: 0.3 # initial ellipsis height
     x0_shift: 0.0 # initial vertical shift
 
         # Confinement field
@@ -19,7 +19,7 @@ params:
     f_α: 2e1 # sharpness
     f_β: 0.2 # depth
     # f_ω0: 2*150.79644 # pulsation (cas circulaire)
-    f_ω0: 15 # pulsation
+    f_ω0: 0.3*15 # pulsation
     f_σ: 1 # direction
     f_nk: 1 # number of Fourier components
         # to approximate a saw-tooth signal
@@ -29,8 +29,8 @@ params:
     drag_gauss_power: 4.0 # drag_gauss_power
     drag_gauss_width: 3.5 # drag_gauss_width
 
-    mass_gauss_power: 6.0 # mass_gauss_power
-    mass_gauss_width: 1.0 # mass_gauss_width
+    mass_gauss_power: 2.0 # mass_gauss_power
+    mass_gauss_width: 0.3 # mass_gauss_width
 
     polar_shift: 6.0
 
@@ -52,4 +52,12 @@ flags:
     circular_wall:        false
     cortex:               true
     centrosome:           false
-    follow_cam:           true
+    follow_cam:           false
+
+load_state:
+    do_load: false
+    filename: "standard_start.csv"
+    do_resample: false
+    do_recenter: false
+
+    init_centro: false
