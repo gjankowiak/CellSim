@@ -52,3 +52,11 @@ flags:
     cortex:               true
     centrosome:           false
     follow_cam:           false
+
+load_state:
+    do_load: false
+    filename: "standard_start2.csv"
+    do_resample: false
+    do_recenter: false
+
+    init_centro: false

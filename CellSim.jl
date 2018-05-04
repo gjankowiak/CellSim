@@ -192,7 +192,11 @@ function main()
     else
         r_x = zeros(2P.N)
         Jr_x = spzeros(2P.N,2P.N)
-        δx = zeros(2P.N)
+        if !F.centrosome
+            δx = zeros(2P.N)
+        else
+            δx = zeros(2P.N+3)
+        end
     end
 
     k = 0
@@ -216,19 +220,24 @@ function main()
                 # cortex evolution
                 resi(vec(x), r_x)
                 resi_J(vec(x), Jr_x)
-                δx[:] = -(Jr_x\r_x)
-                x[:] = x[:] + δx
             end
 
             if F.centrosome
                 # centrosome evolution
-                (centro_A, centro_b) = Centrosome.assemble_system(P, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables)
-                centro_delta = centro_A\-centro_b
-                coords.centro_x[:] += P.δt * centro_delta[1:2]
-                coords.centro_angle[:] += P.δt * centro_delta[3]
+                (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables)
+                M = ([[Jr_x+centro_id_comp centro_b_ce'];[centro_b_ce centro_A]])
 
-                fill!(plotables.mt_force, 0.0)
-                plotables.mt_force[:] = centro_b[1:2]
+                rhs = [-r_x+P.δt*centro_b_co_rhs; P.δt*centro_b_ce_rhs]
+
+                δx[:] = M\rhs
+
+                x[:] = x[:] + δx[1:2P.N]
+
+                coords.centro_x[:] += δx[(2P.N+1):(2P.N+2)]
+                coords.centro_angle[:] += δx[2P.N+3]
+            else
+                δx[:] = -Jr_x\r_x
+                x[:] = x[:] + δx
             end
         end
 

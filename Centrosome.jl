@@ -65,7 +65,7 @@ function init(P::CellSimCommon.Params)
                            zeros(P.N+1), zeros(P.N+1), zeros(P.N+1), # I0, I1, I2,
                            zeros(P.N+1), zeros(P.N+1), # w1, w2
                            zeros(P.N+1), zeros(P.N+1), # wp1, wp2
-                           zeros(P.N+1), zeros(P.N+1), zeros(2, P.N+1), # delta, A1, A2
+                           zeros(P.N+1), zeros(P.N+1), zeros(P.N+1, 2), # delta, A1, A2
                            zeros(P.N+1), zeros(P.N+1)) # a, b
     θ = zeros(P.N+1)
     r = zeros(P.N+1)
@@ -122,9 +122,9 @@ function compute_quadrature_weights(vr::VisibleRegion, qw::QuadratureWeights)
     qw.A1[1:vr.n] = qw.w1[1:vr.n] + qw.w2[vr.idx_m]
 
     idx_m = vr.idx_m
-    @views qw.A2[1,1:vr.n] = @. - qw.w1[1:vr.n]*vr.nodes[1:vr.n,2] - qw.wp1[1:vr.n]*vr.diffs[1:vr.n,2] - qw.w2[idx_m]*vr.nodes[idx_m,2] - qw.wp2[idx_m]*vr.diffs[idx_m,2]
-    @views qw.A2[2,1:vr.n] = @. qw.w1[1:vr.n]*vr.nodes[1:vr.n,1] + qw.wp1[1:vr.n]*vr.diffs[1:vr.n,1] + qw.w2[idx_m]*vr.nodes[idx_m,1] + qw.wp2[idx_m]*vr.diffs[idx_m,1]
-    qw.A2[(vr.n+1):end,:] = 0.0
+    @views qw.A2[1:vr.n,1] = @. - qw.w1[1:vr.n]*vr.nodes[1:vr.n,2] - qw.wp1[1:vr.n]*vr.diffs[1:vr.n,2] - qw.w2[idx_m]*vr.nodes[idx_m,2] - qw.wp2[idx_m]*vr.diffs[idx_m,2]
+    @views qw.A2[1:vr.n,2] = @. qw.w1[1:vr.n]*vr.nodes[1:vr.n,1] + qw.wp1[1:vr.n]*vr.diffs[1:vr.n,1] + qw.w2[idx_m]*vr.nodes[idx_m,1] + qw.wp2[idx_m]*vr.diffs[idx_m,1]
+    qw.A2[:,(vr.n+1):end] = 0.0
 end
 
 function compute_vr(P::CellSimCommon.Params, coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion)
@@ -163,7 +163,7 @@ function compute_mt_longi_force(vr::VisibleRegion, plotables::CellSimCommon.Plot
     #plotables.mt_force_indiv[:] = k*vr.nodes.*CellSimCommon.@entry_norm(vr.nodes).^p
 
     # pushing
-    p = -1
+    p = -2
     k = 1e0
     plotables.mt_force_indiv[1:vr.n,:] = -k*vr.nodes[1:vr.n,:].*abs.(CellSimCommon.@entry_norm(vr.nodes[1:vr.n,:])).^p
 end
@@ -172,10 +172,20 @@ function integrate_θ(f::Array{Float64}, qw::QuadratureWeights, vr::VisibleRegio
     return sum(f[1:vr.n,:].*qw.A1[1:vr.n], 1)
 end
 
+function integrate_θ_eθ(f::Array{Float64}, qw::QuadratureWeights, vr::VisibleRegion)
+    return sum(qw.A2[1:vr.n,:].*f[1:vr.n,:])
+end
+
 function interpolate_on_nodes(f::Array{Float64}, vr::VisibleRegion)
     return vr.M_inter*f
 end
 
+"""
+The full system (cortex + centrosome) is of the form
+
+[[ M    | b_co ]    (X_co^(n+1))    (b_co_n X_ce^n)
+ [ b_ce | A    ]]   (X_ce^(n+1)) =  (b_ce_n X_co^n)
+"""
 function assemble_system(P::CellSimCommon.Params, coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion,
                         qw::QuadratureWeights, pc::PolarCoordinates, plotables::CellSimCommon.Plotables)
     compute_vr(P, coords, bufs, vr)
@@ -208,18 +218,46 @@ function assemble_system(P::CellSimCommon.Params, coords::PointCoords, bufs::Vis
 
     A[3,1] = A[1,3]
     A[3,2] = A[2,3]
-    A *= -P.k_MT
+    A *= P.k_MT
 
-    b = zeros(3)
+    b_ce = zeros(3, 2P.N)
+    b_ce_n = zeros(3)
+
+    # -k_MT/δt ∫ Xθ^(n+1)
+    b_ce[1,1:P.N] = b_ce[2,(P.N+1):2P.N] = -P.k_MT*reshape(qw.A1[1:vr.n], 1, vr.n)*vr.M_inter
+
+    # -k_MT/δt ∫ |Xc - Xθ| eθ^T . Xθ^(n+1)
+    b_ce[3,1:P.N] = -P.k_MT*reshape(qw.A2[1:vr.n,1], 1, vr.n)*vr.M_inter
+    b_ce[3,(P.N+1):2P.N] = -P.k_MT*reshape(qw.A2[1:vr.n,2], 1, vr.n)*vr.M_inter
 
     compute_mt_longi_force(vr, plotables)
 
-    b[1:2] = integrate_θ(plotables.mt_force_indiv, qw, vr)
+    # ∫ F_MT
+    b_ce_n[1:2] = integrate_θ(plotables.mt_force_indiv, qw, vr)
+
+    #  - k_MT ∫ ds/dt ∂_s Xθ^n
+    b_ce_n[1:2] +=  - P.k_MT*reshape(integrate_θ(vr.M_inter*reshape(plotables.transport_force, P.N, 2), qw, vr), 2, 1)
+
+    # - k_MT ∫ |Xc - Xθ| eθ^T . ds/dt ∂_s Xθ^n
+    b_ce_n[3] = -P.k_MT*integrate_θ_eθ(vr.M_inter*reshape(plotables.transport_force, P.N, 2), qw, vr)
+
+
+    ## b_co = b_ce'
+    # b_co = zeros(2P.N, 3)
+
+    b_co_n = zeros(2P.N)
+    b_co_n[1:P.N] = -vr.M_inter'*(qw.A1[1:vr.n].*plotables.mt_force_indiv[1:vr.n,1])
+    b_co_n[(1+P.N):2P.N] = -vr.M_inter'*(qw.A1[1:vr.n].*plotables.mt_force_indiv[1:vr.n,2])
+
+    b_co_n[1:P.N] += -P.k_MT*(vr.M_inter'*(qw.A1[1:vr.n].*(vr.M_inter*plotables.transport_force[1:P.N])))
+    b_co_n[(P.N+1):2P.N] += -P.k_MT*(vr.M_inter'*(qw.A1[1:vr.n].*(vr.M_inter*plotables.transport_force[(P.N+1):2P.N])))
+
+    id_comp = -P.k_MT/P.δt * spdiagm(repmat(vr.M_inter'*(qw.A1[1:vr.n].*(vr.M_inter*ones(P.N))), 2))
 
     # DEBUG, needs calibration
     #plotables.mt_force_indiv[1:vr.n,:] .*= 1e3*qw.A1[1:vr.n,:]
 
-    return A, b
+    return A, id_comp, b_ce, b_ce_n, b_co_n
 end
 
 end # module Centrosome

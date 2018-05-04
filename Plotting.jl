@@ -190,7 +190,7 @@ function update_plot(coords::Forces.PointCoords, k::Int, P::CellSimCommon.Params
         end
 
         scatters[idx_s][:set_offsets](x)
-        scatters[idx_s][:set_sizes](1e4*plotables.mass_source)
+        scatters[idx_s][:set_sizes](0e4*plotables.mass_source)
         colors = Array{String}(size(x, 1))
         fill!(colors, "red")
         x_max, x_max_idx = findmax(x[:,2])
