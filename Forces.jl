@@ -1,6 +1,9 @@
 module Forces
 
 using CellSimCommon
+
+const CSC = CellSimCommon
+
 import Wall, Masks
 import Utils: spdiagm_const, idxmod
 
@@ -106,21 +109,21 @@ function new_PointCoordsShifted(coords::PointCoords)
     N = size(coords.x, 1)
 
     return PointCoordsShifted(
-        view(coords.Δx, CellSimCommon.circ_idx_m1, :),
-        view(coords.Δx, CellSimCommon.circ_idx_p1, :),
-        view(coords.ΔL, CellSimCommon.circ_idx_m1),
-        view(coords.ΔL, CellSimCommon.circ_idx_p1),
-        view(coords.ell, CellSimCommon.circ_idx_m1),
-        view(coords.τ, CellSimCommon.circ_idx_m1, :),
-        view(coords.v, CellSimCommon.circ_idx_m1, :),
-        view(coords.v, CellSimCommon.circ_idx_p1, :))
+        view(coords.Δx, CSC.circ_idx_m1, :),
+        view(coords.Δx, CSC.circ_idx_p1, :),
+        view(coords.ΔL, CSC.circ_idx_m1),
+        view(coords.ΔL, CSC.circ_idx_p1),
+        view(coords.ell, CSC.circ_idx_m1),
+        view(coords.τ, CSC.circ_idx_m1, :),
+        view(coords.v, CSC.circ_idx_m1, :),
+        view(coords.v, CSC.circ_idx_p1, :))
 end
 
 function new_Differentials(coords::PointCoords, coords_s::PointCoordsShifted)
-    Dτ = CellSimCommon.@bc_scalar(1./coords.ΔL).*(CellSimCommon.pointwise_projection(coords.v))*D1p_unorm
-    Dτc = CellSimCommon.@bc_scalar(1./coords.Δ2L).*CellSimCommon.pointwise_projection(coords.vc)*D1c_unorm
-    Dv = -CellSimCommon.@bc_scalar(1./coords.ΔL).*(CellSimCommon.pointwise_projection(coords.τ))*D1p_perp_unorm
-    Dvc = -CellSimCommon.@bc_scalar(1./coords.Δ2L).*CellSimCommon.pointwise_projection(coords.τc)*D1c_perp_unorm
+    Dτ = CSC.@bc_scalar(1./coords.ΔL).*(CSC.pointwise_projection(coords.v))*D1p_unorm
+    Dτc = CSC.@bc_scalar(1./coords.Δ2L).*CSC.pointwise_projection(coords.vc)*D1c_unorm
+    Dv = -CSC.@bc_scalar(1./coords.ΔL).*(CSC.pointwise_projection(coords.τ))*D1p_perp_unorm
+    Dvc = -CSC.@bc_scalar(1./coords.Δ2L).*CSC.pointwise_projection(coords.τc)*D1c_perp_unorm
     return Differentials(
         Dτ, Dτc, Dv, Dvc, M_cs_minus*Dτ
     )
@@ -128,13 +131,13 @@ end
 
 function update_coords(coords::PointCoords, P::Params, x::Matrix{Float64})
     coords.x[:] = x
-    CellSimCommon.@delta!(x, coords.Δx)
-    coords.Δ2x[:] = x[CellSimCommon.circ_idx_p1,:] - x[CellSimCommon.circ_idx_m1,:]
+    CSC.@delta!(x, coords.Δx)
+    coords.Δ2x[:] = x[CSC.circ_idx_p1,:] - x[CSC.circ_idx_m1,:]
     coords.Δ2x_perp[:,1] = -coords.Δ2x[:,2]
     coords.Δ2x_perp[:,2] =  coords.Δ2x[:,1]
 
-    coords.ΔL[:] = CellSimCommon.@entry_norm(coords.Δx)
-    coords.Δ2L[:] = CellSimCommon.@entry_norm(coords.Δ2x)
+    coords.ΔL[:] = CSC.@entry_norm(coords.Δx)
+    coords.Δ2L[:] = CSC.@entry_norm(coords.Δ2x)
 
     coords.ell[:] = coords.ΔL/P.Δσ - 1
 
@@ -142,13 +145,13 @@ function update_coords(coords::PointCoords, P::Params, x::Matrix{Float64})
     coords.τ[:] = coords.Δx./coords.ΔL
 
     # centered unit tangent
-    coords.τc[:] = coords.Δ2x./CellSimCommon.@entry_norm(coords.Δ2x)
+    coords.τc[:] = coords.Δ2x./CSC.@entry_norm(coords.Δ2x)
 
     # unit normal
     coords.v[:] = hcat(view(coords.τ,:,2), -view(coords.τ,:,1))
 
     # centered unit tangent
-    coords.vc[:] = -coords.Δ2x_perp./CellSimCommon.@entry_norm(coords.Δ2x)
+    coords.vc[:] = -coords.Δ2x_perp./CSC.@entry_norm(coords.Δ2x)
 
     # derivatives of tangent and normal unit vectors
     coords.dτc[:] = D1c*vec(coords.τc)
@@ -159,7 +162,7 @@ function update_coords(coords::PointCoords, P::Params, x::Matrix{Float64})
 
     # auxiliary quantities
     coords.dvΔL[:] = 2P.Δσ*D1c_short*(coords.vc./coords.Δ2L)
-    coords.vd2τ[:] = CellSimCommon.@dotprod(coords.vc, coords.d2τ)
+    coords.vd2τ[:] = CSC.@dotprod(coords.vc, coords.d2τ)
     coords.d1vd2τ[:] = D1c_short*coords.vd2τ
     coords.d2vd2τ[:] = D2_short*coords.vd2τ
 end
@@ -274,18 +277,18 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
                                dst_Df::SparseMatrixCSC{Float64},
                                add::Bool=false)
     if add
-        dst_Df[:] = dst_Df + P.K * (CellSimCommon.pointwise_projection(coords.τ)*D1p - CellSimCommon.pointwise_projection(coords_s.τ_m)*D1m
-                         + (CellSimCommon.@bc_scalar(coords.ell).*diffs.Dτ - CellSimCommon.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
+        dst_Df[:] = dst_Df + P.K * (CSC.pointwise_projection(coords.τ)*D1p - CSC.pointwise_projection(coords_s.τ_m)*D1m
+                         + (CSC.@bc_scalar(coords.ell).*diffs.Dτ - CSC.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
                         )/P.Δσ
     else
-        dst_Df[:] = P.K * (CellSimCommon.pointwise_projection(coords.τ)*D1p - CellSimCommon.pointwise_projection(coords_s.τ_m)*D1m
-                           + (CellSimCommon.@bc_scalar(coords.ell).*diffs.Dτ - CellSimCommon.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
+        dst_Df[:] = P.K * (CSC.pointwise_projection(coords.τ)*D1p - CSC.pointwise_projection(coords_s.τ_m)*D1m
+                           + (CSC.@bc_scalar(coords.ell).*diffs.Dτ - CSC.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
                           )/P.Δσ
     end
 end
 
 function compute_confinement_force(coords::PointCoords,
-                                   P::Params, F::Flags, plotables::CellSimCommon.Plotables,
+                                   P::Params, F::Flags, plotables::CSC.Plotables,
                                    dst_f::Vector{Float64},
                                    add::Bool=false, weighted::Bool=false)
     field, ∇field, H_field = Wall.compute_field(coords.x, P, F; gradient=true, hessian=false)
@@ -309,7 +312,7 @@ function compute_confinement_force(coords::PointCoords,
     if weighted
         aux = ([[D1c_short_unorm.*coords.τc[:,1] D1c_short_unorm.*coords.τc[:,2]]
                 [D1c_short_unorm.*coords.τc[:,1] D1c_short_unorm.*coords.τc[:,2]]])
-        H_field = (CellSimCommon.@bc_scalar(coords.Δ2L).*H_field + vec(∇field).*aux)/2P.Δσ
+        H_field = (CSC.@bc_scalar(coords.Δ2L).*H_field + vec(∇field).*aux)/2P.Δσ
     end
     if add
         dst_Df[:] = dst_Df - H_field
@@ -319,7 +322,7 @@ function compute_confinement_force(coords::PointCoords,
 end
 
 function compute_density_increment(coords::PointCoords, coords_s::PointCoordsShifted,
-                                   P::Params, F::Flags)
+                                   P::Params, F::Flags, plt::CSC.Plotables)
     """
     de/polymerization is located around the back/frontmost points, with a weight of (a, 1-2a, a)
     the total flux J = ∫(f)+ dl is fixed by the polymerization speed
@@ -336,10 +339,9 @@ function compute_density_increment(coords::PointCoords, coords_s::PointCoordsShi
     front_norm = sum(mask_front.*ΔLc)
     back_norm = sum(mask_back.*ΔLc)
 
-    f = zeros(P.N)
-    f = P.c*(mask_front/front_norm - mask_back/back_norm)
+    plt.mass_source[:] = 0.5P.c*(mask_front/front_norm - mask_back/back_norm).*ΔLc/P.Δσ
 
-    return f
+    return
 end
 
 function integrate(f::Array{Float64}, P::Params)
@@ -349,8 +351,8 @@ end
 function cumsum_zero(f::Array{Float64})
     z = zeros(f)
     cumsum!(z, f, 1)
-    z -= f
-    # z = 0.5z + 0.5circshift(z, 1)
+    # z -= f
+    z = 0.5z + 0.5circshift(z, 1)
     return z
 end
 
@@ -393,17 +395,17 @@ function compute_mask(coords::PointCoords, P::Params, F::Flags, half_w::Float64,
 end
 
 function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
-                                 P::Params, F::Flags, plt::CellSimCommon.Plotables,
+                                 P::Params, F::Flags, plt::CSC.Plotables,
                                  dst_f::Vector{Float64},
                                  add::Bool=false)
 
-    f = compute_density_increment(coords, coords_s, P, F)
-    plt.mass_source[:] = 0.5(f.*(coords.ΔL + coords_s.ΔL_m))
+    compute_density_increment(coords, coords_s, P, F, plt)
 
     # computation of the transport term
-    plt.mass_source_int[:] = 0.5cumsum_zero(f.*(coords.ΔL + coords_s.ΔL_m))
+    # plt.mass_source_int[:] = cumsum_zero(P.Δσ*plt.mass_source)
+    plt.mass_source_int[:] = cumsum(P.Δσ*plt.mass_source)
 
-    plt.transport_force[:] = (P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int).*coords.Δ2x/2P.Δσ
+    plt.transport_force[:] = (0.5sum(max.(0.0, P.Δσ*plt.mass_source))-plt.mass_source_int).*coords.Δ2x/2P.Δσ
 
     drag_mask_f, drag_mask_b = compute_mask(coords, P, F, P.drag_gauss_width, P.drag_gauss_power)
     drag_mask = drag_mask_f + drag_mask_b
@@ -420,13 +422,15 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
 end
 
 function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShifted,
-                                 P::Params, F::Flags, plt::CellSimCommon.Plotables,
+                                 P::Params, F::Flags, plt::CSC.Plotables,
                                  diffs::Differentials,
                                  dst_Df::SparseMatrixCSC{Float64},
                                  add::Bool=false)
 
-    D_transport_force = CellSimCommon.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1c
-    # D_transport_force = CellSimCommon.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1p
+    D_transport_force = CSC.@bc_scalar(0.5sum(max.(0.0, P.Δσ*plt.mass_source))-plt.mass_source_int) .* D1c
+    # D_transport_force = CSC.@bc_scalar(0.5sum(max.(0.0, P.Δσ*plt.mass_source))-plt.mass_source_int) .* D1p
+    # D_transport_force = 0*CSC.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1c
+    # D_transport_force = CSC.@bc_scalar(P.Δσ*sum(plt.mass_source_int)-plt.mass_source_int) .* D1p
 
     if add
         dst_Df[:] = dst_Df + D_transport_force
@@ -451,7 +455,7 @@ end
 function compute_residuals(x::Vector{Float64},
                            coords::PointCoords, coords_s::PointCoordsShifted,
                            inner_coords::PointCoords, inner_coords_s::PointCoordsShifted,
-                           P::Params, F::Flags, plotables::CellSimCommon.Plotables,
+                           P::Params, F::Flags, plotables::CSC.Plotables,
                            dst::Vector{Float64})
 
     update_coords(inner_coords, P, reshape(x, (P.N, 2)))
@@ -479,7 +483,7 @@ end
 function compute_residuals_J(x::Vector{Float64},
                              coords::PointCoords, coords_s::PointCoordsShifted,
                              inner_coords::PointCoords, inner_coords_s::PointCoordsShifted,
-                             P::Params, F::Flags, plotables::CellSimCommon.Plotables,
+                             P::Params, F::Flags, plotables::CSC.Plotables,
                              dst_Df::SparseMatrixCSC{Float64})
 
     update_coords(inner_coords, P, reshape(x, (P.N, 2)))
@@ -507,7 +511,7 @@ function compute_residuals_J(x::Vector{Float64},
 end
 
 function wrap_residuals(coords::PointCoords, coords_s::PointCoordsShifted,
-                        P::Params, F::Flags, plotables::CellSimCommon.Plotables)
+                        P::Params, F::Flags, plotables::CSC.Plotables)
     inner_coords = deepcopy(coords)
     inner_coords_s = new_PointCoordsShifted(inner_coords)
     resi(x::Vector{Float64}, dst::Vector{Float64}) =

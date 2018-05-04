@@ -201,7 +201,7 @@ function main()
     # outer loop
     while k < P.M
         k += 1
-        # println("iteration #", k)
+        println("iteration #", k)
 
         # inner loop
         if k > 1
