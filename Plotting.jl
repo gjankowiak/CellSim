@@ -6,11 +6,11 @@ PyCall.@pyimport matplotlib.animation as animation
 
 import CellSimCommon
 import Centrosome
-import Forces
+import Cortex
 import Wall
 import Utils
 
-function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellSimCommon.Flags)
+function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellSimCommon.Flags)
     PyPlot.ion()
 
     x = coords.x
@@ -135,7 +135,7 @@ function init_plot(coords::Forces.PointCoords, P::CellSimCommon.Params, F::CellS
     return fig
 end
 
-function update_plot(coords::Forces.PointCoords, k::Int, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::CellSimCommon.Plotables,
+function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::CellSimCommon.Plotables,
                      vr::Centrosome.VisibleRegion)
 
     x = coords.x

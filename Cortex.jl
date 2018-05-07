@@ -1,4 +1,4 @@
-module Forces
+module Cortex
 
 using CellSimCommon
 

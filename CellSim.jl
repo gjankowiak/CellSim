@@ -1,7 +1,7 @@
 module CellSim
 
 import CellSimCommon
-import Forces
+import Cortex
 import Wall
 import Masks
 import Plotting
@@ -165,8 +165,8 @@ function main()
 
     x = copy(x_init)
 
-    Forces.init_FD_matrices(P)
-    coords, coords_s = Forces.new_PointCoords(x, P)
+    Cortex.init_FD_matrices(P)
+    coords, coords_s = Cortex.new_PointCoords(x, P)
 
     if haskey(yaml_config, "load_state") && yaml_config["load_state"]["init_centro"]
         # if the initial centrosome location is given in the config, load it
@@ -186,7 +186,7 @@ function main()
     # centrosome buffers and coordinates
     (centro_bufs, centro_vr, centro_qw, centro_pc) = Centrosome.init(P)
 
-    resi, resi_J = Forces.wrap_residuals(coords, coords_s, P, F, plotables)
+    resi, resi_J = Cortex.wrap_residuals(coords, coords_s, P, F, plotables)
     if F.innerloop
         resi_solver = NLsolve.DifferentiableSparseMultivariateFunction(resi, resi_J)
     else
@@ -209,7 +209,7 @@ function main()
 
         # inner loop
         if k > 1
-            Forces.update_coords(coords, P, x)
+            Cortex.update_coords(coords, P, x)
         end
 
         if F.innerloop

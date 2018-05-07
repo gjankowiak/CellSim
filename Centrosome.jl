@@ -5,7 +5,7 @@ const EPS = sqrtEPS^2
 
 const MT_RADIUS = 0.05
 
-import Forces: PointCoords, PointCoordsShifted
+import Cortex: PointCoords, PointCoordsShifted
 import CellSimCommon
 import Visibility
 
