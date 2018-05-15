@@ -35,6 +35,8 @@ params:
     polar_shift: 6.0
 
     k_MT: 1e-3
+    MT_potential_power: -2
+    MT_factor: 3e0
 
 flags:
     confine:              true

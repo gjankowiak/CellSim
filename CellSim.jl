@@ -64,7 +64,12 @@ function main()
         exit(0)
     end
 
+    date_string = string(Dates.now())
+
     yaml_config = YAML.load(open(config_filename))
+
+    run(`cp $config_filename Run_$date_string.yaml`)
+
     y_params = yaml_config["params"]
 
     # Parameters
@@ -92,7 +97,9 @@ function main()
         y_params["mass_gauss_power"],
         y_params["mass_gauss_width"],
         y_params["polar_shift"],
-        y_params["k_MT"]
+        y_params["k_MT"],
+        y_params["MT_potential_power"],
+        y_params["MT_factor"]
    )
 
     println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
@@ -179,7 +186,7 @@ function main()
 
     fig = Plotting.init_plot(coords, P, F)
     if F.write_animation
-        writer = Plotting.init_animation()
+        writer = Plotting.init_animation(date_string)
         writer[:setup](fig, string(writer[:metadata]["title"], ".mp4"), 100)
     end
 
@@ -223,28 +230,28 @@ function main()
             end
 
             if F.centrosome
-                # centrosome evolution
                 (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables)
+                # centrosome evolution
                 M = ([[Jr_x+centro_id_comp centro_b_ce'];[centro_b_ce centro_A]])
 
                 rhs = [-r_x+P.δt*centro_b_co_rhs; P.δt*centro_b_ce_rhs]
 
                 δx[:] = M\rhs
 
-                x[:] = x[:] + δx[1:2P.N]
+                x .+= reshape(δx[1:2P.N], P.N, 2)
 
                 coords.centro_x[:] += δx[(2P.N+1):(2P.N+2)]
                 coords.centro_angle[:] += δx[2P.N+3]
             else
                 δx[:] = -Jr_x\r_x
-                x[:] = x[:] + δx
+                x .+= + reshape(δx, P.N, 2)
             end
         end
 
 
         # plot
-        plot_period = 10
-        if F.plot & (k % plot_period == 0)
+        plot_period = 20
+        if (F.plot & (k % plot_period == 0))
             Plotting.update_plot(coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
                 writer[:grab_frame]()
@@ -253,7 +260,9 @@ function main()
             long_speed = (height - prev_height) / (plot_period*P.δt)
             prev_height = height
             # println("Long. speed: ", long_speed)
-            writecsv("/scratch/scratch/.last_x", coords.x)
+
+            writecsv("/scratch/scratch/last_x.csv", coords.x)
+            writecsv("/scratch/scratch/last_centro_x.csv", coords.centro_x')
         end
 
         l2_norm = sqrt(sum(abs2, x))

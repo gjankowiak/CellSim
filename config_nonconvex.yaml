@@ -2,7 +2,7 @@ params:
     N: 100 # number of points
     M: 100000 # max. number of iterations
 
-    δt: 2e-4 # time step
+    δt: 1e-3 # time step
 
     P: 4*6.15e-1 # pressure
     K: 2*5e-2 # membrane elasticity
@@ -33,7 +33,9 @@ params:
 
     polar_shift: 6.0
 
-    k_MT: 1.0
+    k_MT: 1e-2
+    MT_potential_power: -2
+    MT_factor: 3e0
 
 flags:
     confine:              true
@@ -50,8 +52,8 @@ flags:
     plot_drag:            true
     circular_wall:        true
     cortex:               true
-    centrosome:           false
-    follow_cam:           false
+    centrosome:           true
+    follow_cam:           true
 
 load_state:
     do_load: false

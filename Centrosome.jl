@@ -9,6 +9,8 @@ import Cortex: PointCoords, PointCoordsShifted
 import CellSimCommon
 import Visibility
 
+const CSC = CellSimCommon
+
 #=
 Except indices vectors, all vectors here are preallocated
 Since the visibility region doesn't have a constant number
@@ -57,7 +59,7 @@ mutable struct PolarCoordinates
     r_p::Vector{Float64}
 end
 
-function init(P::CellSimCommon.Params)
+function init(P::CSC.Params)
     bufs = Visibility.init(P.N+1)
     vr = VisibleRegion(zeros(P.N+1, 2), zeros(P.N+1, 2), zeros(P.N+1),
                        spzeros(0,0), zeros(P.N+1), 0, Int64[], Int64[], zeros(P.N+1))
@@ -78,7 +80,7 @@ function compute_angles_radii(vr::VisibleRegion, polar::PolarCoordinates)
     polar.θ[:] = angle.(vr.nodes[:,1] + vr.nodes[:,2]*im)
     polar.θ_p[1:vr.n] = polar.θ[vr.idx_p]
 
-    polar.r[:] = CellSimCommon.@entry_norm(vr.nodes)
+    polar.r[:] = CSC.@entry_norm(vr.nodes)
     polar.r_p[1:vr.n] = polar.r[vr.idx_p]
 end
 
@@ -93,7 +95,7 @@ function compute_quadrature_weights(vr::VisibleRegion, qw::QuadratureWeights)
     # this is fine for a "small" blind region
 
     qw.c0[:] = sum(abs2, vr.nodes, 2)
-    qw.c1[:] = 2*CellSimCommon.@dotprod(vr.diffs, vr.nodes)
+    qw.c1[:] = 2*CSC.@dotprod(vr.diffs, vr.nodes)
     qw.c2[:] = sum(abs2, vr.diffs, 2)
 
     qw.delta[:] = sqrt.(max.(4*qw.c2.*qw.c0-qw.c1.^2, 0.0))
@@ -127,7 +129,7 @@ function compute_quadrature_weights(vr::VisibleRegion, qw::QuadratureWeights)
     qw.A2[:,(vr.n+1):end] = 0.0
 end
 
-function compute_vr(P::CellSimCommon.Params, coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion)
+function compute_vr(P::CSC.Params, coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion)
     raw_vr = Visibility.vispol(coords.x, coords.centro_x, bufs)
 
     vr.n = raw_vr.t
@@ -141,7 +143,7 @@ function compute_vr(P::CellSimCommon.Params, coords::PointCoords, bufs::Visibili
     vr.nodes[1:vr.n,:] = raw_vr.q[1:vr.n,:] .- reshape(coords.centro_x, 1, 2)
     @views circshift!(vr.diffs[1:vr.n,:], vr.nodes[1:vr.n,:], -1)
     vr.diffs += vr.nodes
-    vr.lengths = CellSimCommon.@entry_norm(vr.diffs)
+    vr.lengths = CSC.@entry_norm(vr.diffs)
 
     vr.lambdas[1:vr.n] = raw_vr.lambdas[1:vr.n]
 
@@ -150,22 +152,11 @@ function compute_vr(P::CellSimCommon.Params, coords::PointCoords, bufs::Visibili
     vr.Δs[1:vr.n] = P.Δσ * vr.lambdas[1:vr.n]
 end
 
-function compute_mt_longi_force(vr::VisibleRegion, plotables::CellSimCommon.Plotables)
-
-    # pushing upto MT_RADIUS and the pulling
-    # p = 1.0
-    # k = 5e0
-    # plotables.mt_force_indiv[:] = k*vr.nodes./CellSimCommon.@entry_norm(vr.nodes).*sign.(CellSimCommon.@entry_norm(vr.nodes)-MT_RADIUS).*abs.(CellSimCommon.@entry_norm(vr.nodes)-MT_RADIUS).^p
-
-    # pulling
-    #p = 0.0
-    #k = 5e0
-    #plotables.mt_force_indiv[:] = k*vr.nodes.*CellSimCommon.@entry_norm(vr.nodes).^p
-
+function compute_mt_longi_force(vr::VisibleRegion, P::CSC.Params, plotables::CSC.Plotables)
     # pushing
-    p = -2
-    k = 1e0
-    plotables.mt_force_indiv[1:vr.n,:] = -k*vr.nodes[1:vr.n,:].*abs.(CellSimCommon.@entry_norm(vr.nodes[1:vr.n,:])).^p
+    p = P.MT_potential_power
+    k = P.MT_factor
+    plotables.mt_force_indiv[1:vr.n,:] = -k*vr.nodes[1:vr.n,:].*abs.(CSC.@entry_norm(vr.nodes[1:vr.n,:])).^p
 end
 
 function integrate_θ(f::Array{Float64}, qw::QuadratureWeights, vr::VisibleRegion)
@@ -186,8 +177,8 @@ The full system (cortex + centrosome) is of the form
 [[ M    | b_co ]    (X_co^(n+1))    (b_co_n X_ce^n)
  [ b_ce | A    ]]   (X_ce^(n+1)) =  (b_ce_n X_co^n)
 """
-function assemble_system(P::CellSimCommon.Params, coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion,
-                        qw::QuadratureWeights, pc::PolarCoordinates, plotables::CellSimCommon.Plotables)
+function assemble_system(P::CSC.Params, coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion,
+                        qw::QuadratureWeights, pc::PolarCoordinates, plotables::CSC.Plotables)
     compute_vr(P, coords, bufs, vr)
     compute_angles_radii(vr, pc)
     compute_line_coefficients(pc, qw)
@@ -200,14 +191,14 @@ function assemble_system(P::CellSimCommon.Params, coords::PointCoords, bufs::Vis
 
     # maybe wrap this into a function
     #= compute using analytical formula
-    @views A[3,3] = CellSimCommon.nansum(@. ( 1/(qw.a[1:n]^2 * cot(pc.θ[vr.idx_p]) + qw.a[1:n]*qw.b[1:n])
+    @views A[3,3] = CSC.nansum(@. ( 1/(qw.a[1:n]^2 * cot(pc.θ[vr.idx_p]) + qw.a[1:n]*qw.b[1:n])
                                              -1/(qw.a[1:n]^2 * cot(pc.θ[1:n]) + qw.a[1:n]*qw.b[1:n])))
 
-    @views A[1,3] = CellSimCommon.nansum(@. 1/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
+    @views A[1,3] = CSC.nansum(@. 1/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
                                              (qw.a[1:n]*log(pc.r[vr.idx_p]) - qw.b[1:n]*pc.θ[vr.idx_p])
                                             -(qw.a[1:n]*log(pc.r[1:n])      + qw.b[1:n]*pc.θ[1:n])))
 
-    @views A[2,3] = CellSimCommon.nansum(@. 1/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
+    @views A[2,3] = CSC.nansum(@. 1/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
                                              (qw.b[1:n]*log(pc.r[vr.idx_p]) + qw.a[1:n]*pc.θ[vr.idx_p])
                                             -(qw.b[1:n]*log(pc.r[1:n])      - qw.a[1:n]*pc.θ[1:n])))
     =#
@@ -230,7 +221,7 @@ function assemble_system(P::CellSimCommon.Params, coords::PointCoords, bufs::Vis
     b_ce[3,1:P.N] = -P.k_MT*reshape(qw.A2[1:vr.n,1], 1, vr.n)*vr.M_inter
     b_ce[3,(P.N+1):2P.N] = -P.k_MT*reshape(qw.A2[1:vr.n,2], 1, vr.n)*vr.M_inter
 
-    compute_mt_longi_force(vr, plotables)
+    compute_mt_longi_force(vr, P, plotables)
 
     # ∫ F_MT
     b_ce_n[1:2] = integrate_θ(plotables.mt_force_indiv, qw, vr)

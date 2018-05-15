@@ -27,7 +27,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
         line = ax[:plot](x[:,1], x[:,2], ".-", zorder=20)[1]
         polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
 
-        ax[:scatter](x[:,1], x[:,2], color="black", zorder=30) # ?
+        ax[:scatter](x[:,1], x[:,2], color="black", zorder=30) # drag force
         ax[:plot](x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1] # initial condition
 
         ax[:quiver](coords.x[1], coords.x[2],
@@ -63,7 +63,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
             ax[:plot](levelset[:,1], levelset[:,2], -levelset[:,1], levelset[:,2], color="red", lw=0.5)
         end
 
-        ax[:scatter](x[:,1], x[:,2], color="red")
+        ax[:scatter](x[:,1], x[:,2], color="red") # added mass
 
         ax[:axvline](0)
     else
@@ -182,7 +182,7 @@ function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params
             idx_s += 1
 
             scatters[idx_s][:set_offsets](vr.nodes[1:vr.n,:].+reshape(coords.centro_x, 1, 2)) # MT force
-            scatters[idx_s][:set_UVC]([plotables.mt_force_indiv[1:vr.n,1]], plotables.mt_force_indiv[1:vr.n,2])
+            scatters[idx_s][:set_UVC](1e-1plotables.mt_force_indiv[1:vr.n,1], 1e-1plotables.mt_force_indiv[1:vr.n,2])
             idx_s += 1
 
             artists[idx_a][:center] = (coords.centro_x[1], coords.centro_x[2])
@@ -266,10 +266,9 @@ function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params
     sleep(0.0001)
 end
 
-function init_animation()
+function init_animation(date_string::String)
     FFMpegWriter = animation.FFMpegWriter
-    date = string(Dates.now())
-    metadata = Dict((:title => string("Cell_run_", date), :artist => "GJ"))
+    metadata = Dict((:title => string("Run_", date_string), :artist => "GJ"))
     writer = FFMpegWriter(fps=15, metadata=metadata)
     return writer
 end

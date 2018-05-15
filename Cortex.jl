@@ -236,8 +236,9 @@ function compute_front_back(coords::PointCoords, P::Params, F::Flags)
         x_back, x_back_idx = findmin(ang)
         x_front, x_front_idx = findmax(ang)
         if (x_front - x_back) > pi
-            x_back, x_front = x_front, x_back
-            x_back_idx, x_front_idx = x_front_idx, x_back_idx
+            ang .+= 2pi*(ang .< 0.0)
+            x_back, x_back_idx = findmin(ang)
+            x_front, x_front_idx = findmax(ang)
         end
     end
     return ((x_back, x_back_idx), (x_front, x_front_idx))
@@ -404,8 +405,10 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
     # computation of the transport term
     # plt.mass_source_int[:] = cumsum_zero(P.Δσ*plt.mass_source)
     plt.mass_source_int[:] = cumsum(P.Δσ*plt.mass_source)
+    plt.mass_source_int[:] = 0.5(plt.mass_source_int + plt.mass_source_int[CSC.circ_idx_m1])
 
     plt.transport_force[:] = (0.5sum(max.(0.0, P.Δσ*plt.mass_source))-plt.mass_source_int).*coords.Δ2x/2P.Δσ
+    plt.transport_force[:] = (-plt.mass_source_int).*coords.Δ2x/2P.Δσ
 
     drag_mask_f, drag_mask_b = compute_mask(coords, P, F, P.drag_gauss_width, P.drag_gauss_power)
     drag_mask = drag_mask_f + drag_mask_b
