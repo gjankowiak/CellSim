@@ -57,7 +57,7 @@ flags:
 
 load_state:
     do_load: true
-    filename: "initial_condition/start_straight.csv"
+    filename: "initial_conditions/start_straight.csv"
     do_resample: false
     do_recenter: false
 
