@@ -268,7 +268,7 @@ end
 
 function init_animation(date_string::String)
     FFMpegWriter = animation.FFMpegWriter
-    metadata = Dict((:title => string("Run_", date_string), :artist => "GJ"))
+    metadata = Dict((:title => string("runs/Run_", date_string), :artist => "GJ"))
     writer = FFMpegWriter(fps=15, metadata=metadata)
     return writer
 end

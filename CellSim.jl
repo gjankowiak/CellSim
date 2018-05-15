@@ -68,7 +68,7 @@ function main()
 
     yaml_config = YAML.load(open(config_filename))
 
-    run(`cp $config_filename Run_$date_string.yaml`)
+    run(`cp $config_filename runs/Run_$date_string.yaml`)
 
     y_params = yaml_config["params"]
 
