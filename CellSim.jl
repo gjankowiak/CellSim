@@ -55,7 +55,7 @@ end
 function main()
     # initialization
 
-    config_filename = "config.yaml"
+    config_filename = "configs/default.yaml"
     if length(ARGS) > 0 && isfile(ARGS[1])
         config_filename = ARGS[1]
     else
