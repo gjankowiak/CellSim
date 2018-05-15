@@ -57,7 +57,7 @@ flags:
 
 load_state:
     do_load: true
-    filename: "start_centro.csv"
+    filename: "initial_conditiosn/start_circle.csv"
     do_resample: false
     do_recenter: false
 
