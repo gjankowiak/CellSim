@@ -41,15 +41,18 @@ struct QuadratureWeights
     I0::Vector{Float64}
     I1::Vector{Float64}
     I2::Vector{Float64}
+    w0::Vector{Float64}
     w1::Vector{Float64}
     w2::Vector{Float64}
-    wp1::Vector{Float64}
-    wp2::Vector{Float64}
     delta::Vector{Float64}
     A1::Vector{Float64}
     A2::Array{Float64,2}
     a::Vector{Float64}
     b::Vector{Float64}
+    tmp1::Array{Float64,2}
+    tmp2::Array{Float64,2}
+    tmp3::Array{Float64,2}
+    tmp4::Array{Float64,2}
 end
 
 mutable struct PolarCoordinates
@@ -65,10 +68,11 @@ function init(P::CSC.Params)
                        spzeros(0,0), zeros(P.N+1), 0, Int64[], Int64[], zeros(P.N+1))
     qw = QuadratureWeights(zeros(P.N+1), zeros(P.N+1), zeros(P.N+1), # c0, c1, c2
                            zeros(P.N+1), zeros(P.N+1), zeros(P.N+1), # I0, I1, I2,
-                           zeros(P.N+1), zeros(P.N+1), # w1, w2
-                           zeros(P.N+1), zeros(P.N+1), # wp1, wp2
+                           zeros(P.N+1), zeros(P.N+1), zeros(P.N+1), # w0, w1, w2
                            zeros(P.N+1), zeros(P.N+1), zeros(P.N+1, 2), # delta, A1, A2
-                           zeros(P.N+1), zeros(P.N+1)) # a, b
+                           zeros(P.N+1), zeros(P.N+1), # a, b
+                           zeros(P.N+1,2), zeros(P.N+1,2), # tmp1, tmp2
+                           zeros(P.N+1,2), zeros(P.N+1,2)) # tmp3, tmp4
     θ = zeros(P.N+1)
     r = zeros(P.N+1)
     pc = PolarCoordinates(θ, r, view(θ, :), view(r, :))
@@ -77,16 +81,16 @@ function init(P::CSC.Params)
 end
 
 function compute_angles_radii(vr::VisibleRegion, polar::PolarCoordinates)
-    polar.θ[:] = angle.(vr.nodes[:,1] + vr.nodes[:,2]*im)
+    polar.θ .= angle.(vr.nodes[:,1] + vr.nodes[:,2]*im)
     polar.θ_p[1:vr.n] = polar.θ[vr.idx_p]
 
-    polar.r[:] = CSC.@entry_norm(vr.nodes)
+    polar.r .= vec(CSC.@entry_norm(vr.nodes))
     polar.r_p[1:vr.n] = polar.r[vr.idx_p]
 end
 
 function compute_line_coefficients(polar::PolarCoordinates, qw::QuadratureWeights)
-    qw.a[:] = @. (polar.r_p*sin(polar.θ_p) - polar.r*sin(polar.θ))/(polar.r*polar.r_p*sin(polar.θ_p-polar.θ))
-    qw.b[:] = @. (-polar.r_p*cos(polar.θ_p) - polar.r*cos(polar.θ))/(polar.r*polar.r_p*sin(polar.θ_p-polar.θ))
+    qw.a .= @. (polar.r_p*sin(polar.θ_p) - polar.r*sin(polar.θ))/(polar.r*polar.r_p*sin(polar.θ_p-polar.θ))
+    qw.b .= @. (-polar.r_p*cos(polar.θ_p) - polar.r*cos(polar.θ))/(polar.r*polar.r_p*sin(polar.θ_p-polar.θ))
 end
 
 function compute_quadrature_weights(vr::VisibleRegion, qw::QuadratureWeights)
@@ -94,39 +98,53 @@ function compute_quadrature_weights(vr::VisibleRegion, qw::QuadratureWeights)
     # doing it on the whole range is correct but results some useless computations
     # this is fine for a "small" blind region
 
-    qw.c0[:] = sum(abs2, vr.nodes, 2)
-    qw.c1[:] = 2*CSC.@dotprod(vr.diffs, vr.nodes)
-    qw.c2[:] = sum(abs2, vr.diffs, 2)
+    idx_m = vr.idx_m
 
-    qw.delta[:] = sqrt.(max.(4*qw.c2.*qw.c0-qw.c1.^2, 0.0))
+    # |Xi - Xc|²
+    qw.c0 .= vec(sum(abs2, vr.nodes, 2))
+    # 2(Xi - Xc).(Xi+1 - Xi)
+    qw.c1 .= vec(2*CSC.@dotprod(vr.diffs, vr.nodes))
+    # |Xi+1 - Xi|²
+    qw.c2 .= vec(sum(abs2, vr.diffs, 2))
+
+    qw.delta .= sqrt.(max.(4*qw.c2.*qw.c0-qw.c1.^2, 0.0))
     idx = find(qw.delta .> sqrtEPS)
 
-    fill!(qw.I0, 0.0)
-    fill!(qw.I1, 0.0)
-    fill!(qw.I2, 0.0)
+    qw.I0 .= 0.0
+    qw.I1 .= 0.0
+    qw.I2 .= 0.0
 
     @views begin
+        # ∫ dλ/|c0 + c1 λ + c2 λ²|
         qw.I0[idx] = (2*(atan.((2qw.c2[idx] + qw.c1[idx])./qw.delta[idx]) - atan.(qw.c1[idx]./qw.delta[idx]))./qw.delta[idx])
+
+        # ∫ λ dλ/|c0 + c1 λ + c2 λ²|
         qw.I1[idx] = @. (-qw.c1[idx]*qw.I0[idx]  +  log(1 + (qw.c1[idx] + qw.c2[idx])/qw.c0[idx]))/2qw.c2[idx]
+
+        # ∫ λ² dλ/|c0 + c1 λ + c2 λ²|
         qw.I2[idx] = @. -qw.c1[idx]/qw.c2[idx]*qw.I1[idx] - qw.c0[idx]/qw.c2[idx]*qw.I0[idx] + 1/qw.c2[idx]
+
+        qw.tmp1[:,1] = -vr.nodes[:,2]
+        qw.tmp1[:,2] =  vr.nodes[:,1]
+        qw.tmp2[:,1] = -vr.diffs[:,2]
+        qw.tmp2[:,2] =  vr.diffs[:,1]
+
+        qw.tmp3[:,1] = abs.(sum(qw.tmp2.*vr.nodes, 2))
+
+        qw.w0 .= qw.tmp3[:,1].*qw.I0
+        qw.w1 .= qw.tmp3[:,1].*qw.I1
+        qw.w2 .= qw.tmp3[:,1].*qw.I2
     end
 
-    @views qw.w2[:] = abs.(-vr.diffs[:,2].*vr.nodes[:,1]+vr.diffs[:,1].*vr.nodes[:,2])
+    qw.A1 .= 0.0
+    qw.A2 .= 0.0
 
-    qw.w1[:] = vr.Δs.*qw.w2.*(qw.I0-qw.I1)
+    @views qw.A1[1:vr.n] = qw.w0[1:vr.n] - qw.w1[1:vr.n] + qw.w1[idx_m]
 
-    qw.wp1[:] = vr.Δs.*qw.w2.*(qw.I1-qw.I2)
-    qw.wp2[:] = vr.Δs.*qw.w2.*qw.I2
+    @views qw.A2[1:vr.n,:] = @. (qw.tmp3[1:vr.n,1] * (qw.tmp1[1:vr.n,:]*(qw.I0[1:vr.n] - qw.I1[1:vr.n])
+                                                   + qw.tmp2[1:vr.n,:]*(qw.I1[1:vr.n] - qw.I2[1:vr.n]))
+                                 + qw.tmp3[idx_m,1] * (qw.tmp1[idx_m,:]*qw.I1[idx_m] + qw.tmp2[idx_m,:]*qw.I2[idx_m]))
 
-    qw.w2[:] .*= vr.Δs.*qw.I1
-
-    qw.A1[(vr.n+1):end] = 0.0
-    qw.A1[1:vr.n] = qw.w1[1:vr.n] + qw.w2[vr.idx_m]
-
-    idx_m = vr.idx_m
-    @views qw.A2[1:vr.n,1] = @. - qw.w1[1:vr.n]*vr.nodes[1:vr.n,2] - qw.wp1[1:vr.n]*vr.diffs[1:vr.n,2] - qw.w2[idx_m]*vr.nodes[idx_m,2] - qw.wp2[idx_m]*vr.diffs[idx_m,2]
-    @views qw.A2[1:vr.n,2] = @. qw.w1[1:vr.n]*vr.nodes[1:vr.n,1] + qw.wp1[1:vr.n]*vr.diffs[1:vr.n,1] + qw.w2[idx_m]*vr.nodes[idx_m,1] + qw.wp2[idx_m]*vr.diffs[idx_m,1]
-    qw.A2[:,(vr.n+1):end] = 0.0
 end
 
 function compute_vr(P::CSC.Params, coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion)
@@ -142,7 +160,7 @@ function compute_vr(P::CSC.Params, coords::PointCoords, bufs::Visibility.Buffers
     # the visibility region nodes are given RELATIVE TO THE CENTROSOME
     vr.nodes[1:vr.n,:] = raw_vr.q[1:vr.n,:] .- reshape(coords.centro_x, 1, 2)
     @views circshift!(vr.diffs[1:vr.n,:], vr.nodes[1:vr.n,:], -1)
-    vr.diffs += vr.nodes
+    vr.diffs -= vr.nodes
     vr.lengths = CSC.@entry_norm(vr.diffs)
 
     vr.lambdas[1:vr.n] = raw_vr.lambdas[1:vr.n]
@@ -160,11 +178,11 @@ function compute_mt_longi_force(vr::VisibleRegion, P::CSC.Params, plotables::CSC
 end
 
 function integrate_θ(f::Array{Float64}, qw::QuadratureWeights, vr::VisibleRegion)
-    return sum(f[1:vr.n,:].*qw.A1[1:vr.n], 1)
+    return @views sum(f[1:vr.n,:].*qw.A1[1:vr.n], 1)
 end
 
 function integrate_θ_eθ(f::Array{Float64}, qw::QuadratureWeights, vr::VisibleRegion)
-    return sum(qw.A2[1:vr.n,:].*f[1:vr.n,:])
+    return @views sum(qw.A2[1:vr.n,:].*f[1:vr.n,:])
 end
 
 function interpolate_on_nodes(f::Array{Float64}, vr::VisibleRegion)
@@ -184,28 +202,13 @@ function assemble_system(P::CSC.Params, coords::PointCoords, bufs::Visibility.Bu
     compute_line_coefficients(pc, qw)
     compute_quadrature_weights(vr, qw)
 
-    n = vr.n
+    vr_n = vr.n
 
-    # for now we assume ∂t X = 0
     A = 2π*eye(3)
 
-    # maybe wrap this into a function
-    #= compute using analytical formula
-    @views A[3,3] = CSC.nansum(@. ( 1/(qw.a[1:n]^2 * cot(pc.θ[vr.idx_p]) + qw.a[1:n]*qw.b[1:n])
-                                             -1/(qw.a[1:n]^2 * cot(pc.θ[1:n]) + qw.a[1:n]*qw.b[1:n])))
-
-    @views A[1,3] = CSC.nansum(@. 1/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
-                                             (qw.a[1:n]*log(pc.r[vr.idx_p]) - qw.b[1:n]*pc.θ[vr.idx_p])
-                                            -(qw.a[1:n]*log(pc.r[1:n])      + qw.b[1:n]*pc.θ[1:n])))
-
-    @views A[2,3] = CSC.nansum(@. 1/(qw.a[1:n]^2 + qw.b[1:n]^2)*(
-                                             (qw.b[1:n]*log(pc.r[vr.idx_p]) + qw.a[1:n]*pc.θ[vr.idx_p])
-                                            -(qw.b[1:n]*log(pc.r[1:n])      - qw.a[1:n]*pc.θ[1:n])))
-    =#
-
     #= compute using quadrature =#
-    @views A[3,3] = integrate_θ(pc.r[1:n].^2, qw, vr)[1]
-    @views A[1:2,3] = integrate_θ([-vr.nodes[1:n,2] vr.nodes[1:n,1]], qw, vr)
+    A[3,3] = integrate_θ(pc.r.^2, qw, vr)[1]
+    A[1:2,3] = integrate_θ(qw.tmp1, qw, vr)
 
     A[3,1] = A[1,3]
     A[3,2] = A[2,3]
@@ -215,11 +218,11 @@ function assemble_system(P::CSC.Params, coords::PointCoords, bufs::Visibility.Bu
     b_ce_n = zeros(3)
 
     # -k_MT/δt ∫ Xθ^(n+1)
-    b_ce[1,1:P.N] = b_ce[2,(P.N+1):2P.N] = -P.k_MT*reshape(qw.A1[1:vr.n], 1, vr.n)*vr.M_inter
+    b_ce[1,1:P.N] = b_ce[2,(P.N+1):2P.N] = -P.k_MT*reshape(qw.A1[1:vr_n], 1, vr_n)*vr.M_inter
 
     # -k_MT/δt ∫ |Xc - Xθ| eθ^T . Xθ^(n+1)
-    b_ce[3,1:P.N] = -P.k_MT*reshape(qw.A2[1:vr.n,1], 1, vr.n)*vr.M_inter
-    b_ce[3,(P.N+1):2P.N] = -P.k_MT*reshape(qw.A2[1:vr.n,2], 1, vr.n)*vr.M_inter
+    b_ce[3,1:P.N] = -P.k_MT*reshape(qw.A2[1:vr_n,1], 1, vr_n)*vr.M_inter
+    b_ce[3,(P.N+1):2P.N] = -P.k_MT*reshape(qw.A2[1:vr_n,2], 1, vr_n)*vr.M_inter
 
     compute_mt_longi_force(vr, P, plotables)
 
@@ -237,16 +240,13 @@ function assemble_system(P::CSC.Params, coords::PointCoords, bufs::Visibility.Bu
     # b_co = zeros(2P.N, 3)
 
     b_co_n = zeros(2P.N)
-    b_co_n[1:P.N] = -vr.M_inter'*(qw.A1[1:vr.n].*plotables.mt_force_indiv[1:vr.n,1])
-    b_co_n[(1+P.N):2P.N] = -vr.M_inter'*(qw.A1[1:vr.n].*plotables.mt_force_indiv[1:vr.n,2])
+    b_co_n[1:P.N] = -vr.M_inter'*(qw.A1[1:vr_n].*plotables.mt_force_indiv[1:vr_n,1])
+    b_co_n[(1+P.N):2P.N] = -vr.M_inter'*(qw.A1[1:vr_n].*plotables.mt_force_indiv[1:vr_n,2])
 
-    b_co_n[1:P.N] += -P.k_MT*(vr.M_inter'*(qw.A1[1:vr.n].*(vr.M_inter*plotables.transport_force[1:P.N])))
-    b_co_n[(P.N+1):2P.N] += -P.k_MT*(vr.M_inter'*(qw.A1[1:vr.n].*(vr.M_inter*plotables.transport_force[(P.N+1):2P.N])))
+    b_co_n[1:P.N] += -P.k_MT*(vr.M_inter'*(qw.A1[1:vr_n].*(vr.M_inter*plotables.transport_force[1:P.N])))
+    b_co_n[(P.N+1):2P.N] += -P.k_MT*(vr.M_inter'*(qw.A1[1:vr_n].*(vr.M_inter*plotables.transport_force[(P.N+1):2P.N])))
 
-    id_comp = -P.k_MT/P.δt * spdiagm(repmat(vr.M_inter'*(qw.A1[1:vr.n].*(vr.M_inter*ones(P.N))), 2))
-
-    # DEBUG, needs calibration
-    #plotables.mt_force_indiv[1:vr.n,:] .*= 1e3*qw.A1[1:vr.n,:]
+    id_comp = -P.k_MT/P.δt * spdiagm(repmat(vr.M_inter'*(qw.A1[1:vr_n].*(vr.M_inter*ones(P.N))), 2))
 
     return A, id_comp, b_ce, b_ce_n, b_co_n
 end

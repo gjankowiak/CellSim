@@ -134,8 +134,17 @@ function main()
           y_flags["write_animation"]
     )
 
-    println(P)
-    println(F)
+    println("Parameters:")
+    for s in fieldnames(P)
+        println(string("    ", s, ": ", getfield(P, s)))
+    end
+    println("")
+
+    println("Flags:")
+    for s in fieldnames(F)
+        println(string("    ", s, ": ", getfield(F, s)))
+    end
+    println(" ")
 
     CellSimCommon.init(P.N)
 
@@ -146,8 +155,8 @@ function main()
         x_init = readcsv(load_state["filename"])
         if load_state["do_recenter"]
             x_init .-= sum(x_init, 1)/size(x_init, 1)
-            x_init[:,1] *= P.x0_a/abs(maximum(x_init[:,1]))
-            x_init[:,2] *= P.x0_b/abs(maximum(x_init[:,2]))
+            #x_init[:,1] *= P.x0_a/abs(maximum(x_init[:,1]))
+            #x_init[:,2] *= P.x0_b/abs(maximum(x_init[:,2]))
         end
 
         # if F.circular_wall
@@ -175,10 +184,10 @@ function main()
     Cortex.init_FD_matrices(P)
     coords, coords_s = Cortex.new_PointCoords(x, P)
 
-    if haskey(yaml_config, "load_state") && yaml_config["load_state"]["init_centro"]
+    if haskey(yaml_config, "load_state") && load_state["init_centro"]
         # if the initial centrosome location is given in the config, load it
         # the centrosome angle doesn't have any impact at this point
-        coords.centro_x[:] = [yaml_config["load_state"]["centro_x"]; yaml_config["load_state"]["centro_y"]]
+        coords.centro_x[:] = readcsv(load_state["filename_centro"])
     else
         # otherwise, pick the centrosome location as the initial center of mass
         coords.centro_x[:] = sum(x_init, 1)/size(x_init,1)
@@ -212,7 +221,8 @@ function main()
     # outer loop
     while k < P.M
         k += 1
-        println("iteration #", k)
+        print("\b"^100)
+        print(" iteration #", k, ", ")
 
         # inner loop
         if k > 1
@@ -227,6 +237,7 @@ function main()
                 # cortex evolution
                 resi(vec(x), r_x)
                 resi_J(vec(x), Jr_x)
+
             end
 
             if F.centrosome
@@ -248,9 +259,8 @@ function main()
             end
         end
 
-
         # plot
-        plot_period = 20
+        plot_period = F.write_animation ? 1 : 10
         if (F.plot & (k % plot_period == 0))
             Plotting.update_plot(coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
@@ -264,6 +274,7 @@ function main()
             writecsv("/scratch/scratch/last_x.csv", coords.x)
             writecsv("/scratch/scratch/last_centro_x.csv", coords.centro_x')
         end
+        sleep(0.01)
 
         l2_norm = sqrt(sum(abs2, x))
 

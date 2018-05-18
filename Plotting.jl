@@ -16,6 +16,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
     x = coords.x
 
     fig = PyPlot.figure(figsize=(12.8, 10))
+    PyPlot.show()
     # figManager = PyPlot.get_current_fig_manager()
     # figManager[:window][:showMaximized]()
 
@@ -26,6 +27,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 
         line = ax[:plot](x[:,1], x[:,2], ".-", zorder=20)[1]
         polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
+
 
         ax[:scatter](x[:,1], x[:,2], color="black", zorder=30) # drag force
         ax[:plot](x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1] # initial condition
@@ -66,6 +68,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
         ax[:scatter](x[:,1], x[:,2], color="red") # added mass
 
         ax[:axvline](0)
+
     else
         ax = PyPlot.axes(xlim = (-15, 15),ylim=(-5, 5))
 
@@ -117,7 +120,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
     x_span = (x_max-x_min)
     y_min, y_max = minimum(x[:,2]), maximum(x[:,2])
     y_mid = 0.5(y_max+y_min)
-    y_span = (y_max+y_min)
+    y_span = (y_max-y_min)
 
     if !F.landscape_plot
         ax[:set_xlim]((x_mid-x_span, x_mid+x_span))
@@ -127,11 +130,12 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
         ax[:set_xlim]((y_mid-y_span, y_mid+y_span))
     end
 
-    #PyPlot.show()
-
     fig[:tight_layout]()
+    PyPlot.draw()
+
+    sleep(0.001)
     println("Finishing plot init...")
-    sleep(1)
+    sleep(3)
     return fig
 end
 
@@ -234,7 +238,6 @@ function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params
         x_mid = 0.5(x_max+x_min)
     end
 
-
     if F.follow_cam
         lims = ax[:get_xlim]()
         x_min, x_max = minimum(x[:,1]), maximum(x[:,1])
@@ -263,7 +266,7 @@ function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params
 
 
     PyPlot.draw()
-    sleep(0.0001)
+    sleep(0.001)
 end
 
 function init_animation(date_string::String)
