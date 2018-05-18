@@ -1,6 +1,6 @@
 params:
-    N: 100 # number of points
-    M: 20000 # max. number of iterations
+    N: 300 # number of points
+    M: 5000 # max. number of iterations
 
     δt: 2e-3 # time step
 
@@ -33,9 +33,9 @@ params:
 
     polar_shift: 6.0
 
-    k_MT: 5e-3
+    k_MT: 5e-4
     MT_potential_power: -2
-    MT_factor: 3e0
+    MT_factor: 1e-1
 
 flags:
     confine:              true
@@ -58,7 +58,7 @@ flags:
 load_state:
     do_load: true
     filename: "initial_conditions/start_straight.csv"
-    do_resample: false
+    do_resample: true
     do_recenter: false
 
     init_centro: false
