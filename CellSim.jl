@@ -150,32 +150,34 @@ function main()
 
     plotables = CellSimCommon.new_plotables(P.N)
 
-    if haskey(yaml_config, "load_state") && yaml_config["load_state"]["do_load"]
+    if haskey(yaml_config, "load_state")
         load_state = yaml_config["load_state"]
-        x_init = readcsv(load_state["filename"])
-        if load_state["do_recenter"]
-            x_init .-= sum(x_init, 1)/size(x_init, 1)
-            #x_init[:,1] *= P.x0_a/abs(maximum(x_init[:,1]))
-            #x_init[:,2] *= P.x0_b/abs(maximum(x_init[:,2]))
-        end
-
-        # if F.circular_wall
-            # x_init[:,1] += P.polar_shift
-        # end
-
-        if load_state["do_resample"]
-            x_init = EvenParam.reparam(x_init, true, P.N)
-        end
-
-        if !Utils.check_ccw_polygon(x_init)
-            println("[info] reversing initial condition")
-            @views begin
-                reverse!(x_init[:,1])
-                reverse!(x_init[:,2])
+        if yaml_config["load_state"]["do_load"]
+            x_init = readcsv(load_state["filename"])
+            if load_state["do_recenter"]
+                x_init .-= sum(x_init, 1)/size(x_init, 1)
+                #x_init[:,1] *= P.x0_a/abs(maximum(x_init[:,1]))
+                #x_init[:,2] *= P.x0_b/abs(maximum(x_init[:,2]))
             end
+
+            # if F.circular_wall
+            # x_init[:,1] += P.polar_shift
+            # end
+
+            if load_state["do_resample"]
+                x_init = EvenParam.reparam(x_init, true, P.N)
+            end
+
+            if !Utils.check_ccw_polygon(x_init)
+                println("[info] reversing initial condition")
+                @views begin
+                    reverse!(x_init[:,1])
+                    reverse!(x_init[:,2])
+                end
+            end
+        else
+            x_init = EvenParam.reparam(compute_initial_x(P, F; convex=true))
         end
-    else
-        x_init = EvenParam.reparam(compute_initial_x(P, F; convex=true))
     end
 
 
@@ -184,7 +186,7 @@ function main()
     Cortex.init_FD_matrices(P)
     coords, coords_s = Cortex.new_PointCoords(x, P)
 
-    if haskey(yaml_config, "load_state") && load_state["init_centro"]
+    if haskey(yaml_config, "load_state") && load_state["do_load"] && load_state["init_centro"]
         # if the initial centrosome location is given in the config, load it
         # the centrosome angle doesn't have any impact at this point
         coords.centro_x[:] = readcsv(load_state["filename_centro"])
@@ -271,10 +273,9 @@ function main()
             prev_height = height
             # println("Long. speed: ", long_speed)
 
-            writecsv("/scratch/scratch/last_x.csv", coords.x)
-            writecsv("/scratch/scratch/last_centro_x.csv", coords.centro_x')
         end
-        sleep(0.01)
+        writecsv("/scratch/scratch/last_x.csv", coords.x)
+        writecsv("/scratch/scratch/last_centro_x.csv", coords.centro_x')
 
         l2_norm = sqrt(sum(abs2, x))
 
