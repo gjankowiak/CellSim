@@ -274,8 +274,8 @@ function main()
             # println("Long. speed: ", long_speed)
 
         end
-        writecsv("/scratch/scratch/last_x.csv", coords.x)
-        writecsv("/scratch/scratch/last_centro_x.csv", coords.centro_x')
+        writecsv(".last_x.csv", coords.x)
+        writecsv(".last_centro_x.csv", coords.centro_x')
 
         l2_norm = sqrt(sum(abs2, x))
 
