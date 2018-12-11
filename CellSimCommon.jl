@@ -2,14 +2,26 @@ module CellSimCommon
 
 export Params, Flags
 
-function init(N::Int64)
-    const global circ_idx_m2 = circshift(1:N,  2)
-    const global circ_idx_m1 = circshift(1:N,  1)
-    const global circ_idx_p1 = circshift(1:N, -1)
-    const global circ_idx_p2 = circshift(1:N, -2)
+import SparseArrays
+const SA = SparseArrays
+
+struct CircIdx
+    m1::Array{Int64,1}
+    m2::Array{Int64,1}
+    p1::Array{Int64,1}
+    p2::Array{Int64,1}
 end
 
-immutable Params
+function init_circ_idx()
+    CircIdx([], [], [], [])
+end
+
+function init_circ_idx(N::Int64)
+    CircIdx(circshift(1:N,  2), circshift(1:N,  1),
+             circshift(1:N, -1), circshift(1:N, -2))
+end
+
+struct Params
     N::Int64      # number of points
     M::Int64      # max. number of iterations
 
@@ -50,7 +62,7 @@ immutable Params
     MT_factor::Float64 # the prefactor k in F_MT
 end
 
-immutable Flags
+struct Flags
     # model options
     confine::Bool
     adjust_drag::Bool
@@ -100,7 +112,7 @@ function new_plotables(N::Int64)
        )
 end
 
-immutable Metrics
+struct Metrics
     iter::Int64
 end
 
@@ -117,7 +129,7 @@ macro delta!(src, dst)
 end
 
 macro entry_norm(x)
-    return esc(:(vec(sqrt.(sum(abs2, $x, 2)))))
+    return esc(:(vec(sqrt.(sum(abs2, $x; dims=2)))))
 end
 
 macro barycenter(x)
@@ -125,7 +137,7 @@ macro barycenter(x)
 end
 
 macro dotprod(x,y)
-    return esc(:(sum($x.*$y,2)))
+    return esc(:(sum($x.*$y; dims=2)))
 end
 
 macro new_point(x_max, x_nb)
@@ -137,11 +149,11 @@ macro det(x1, x2)
 end
 
 macro repdiag(M, n)
-    return :( spdiagm(repmat($M, $n, 1), 0) )
+    return :( SA.spdiagm(0 => repeat($M, $n, 1)) )
 end
 
 macro repdiagblk(M, n)
-    return :( blkdiag(ntuple((_) -> $M, $n)...) )
+    return :( SA.blockdiag(ntuple((_) -> $M, $n)...) )
 end
 
 @inbounds function shift!(src::Array{Float64}, dst::Array{Float64})
@@ -167,7 +179,7 @@ function perp!(src::Matrix, dst::Matrix)
 end
 
 macro bc_scalar(v)
-    return esc(:(repmat($v, 2, 1)))
+    return esc(:(repeat($v, 2, 1)))
 end
 
 """
@@ -177,7 +189,10 @@ end
 """
 function pointwise_projection(v)
     N = size(v, 1)
-    return spdiagm(([v[:,1].*v[:,1]; v[:,2].*v[:,2]], v[:,1].*v[:,2], v[:,1].*v[:,2]), (0, -N, N), 2*N, 2*N)
+    return SA.spdiagm( 0 => [v[:,1].*v[:,1]; v[:,2].*v[:,2]],
+                       -N => v[:,1].*v[:,2],
+                        N => v[:,1].*v[:,2])
+    # return SA.spdiagm(([v[:,1].*v[:,1]; v[:,2].*v[:,2]], v[:,1].*v[:,2], v[:,1].*v[:,2]), (0, -N, N), 2*N, 2*N)
 end
 
 """
@@ -187,7 +202,10 @@ end
 """
 function pointwise_projection(bra, ket)
     N = size(bra, 1)
-    return spdiagm(([bra[:,1].*ket[:,1]; bra[:,2].*ket[:,2]], bra[:,1].*ket[:,2], ket[:,1].*bra[:,2]), (0, -N, N), 2*N, 2*N)
+    return SA.spdiagm( 0 => [bra[:,1].*ket[:,1]; bra[:,2].*ket[:,2]],
+                       -N => bra[:,1].*ket[:,2],
+                        N => ket[:,1].*bra[:,2])
+    # return SA.spdiagm(([bra[:,1].*ket[:,1]; bra[:,2].*ket[:,2]], bra[:,1].*ket[:,2], ket[:,1].*bra[:,2]), (0, -N, N), 2*N, 2*N)
 end
 
 """
@@ -197,7 +215,7 @@ end
 """
 function pointwise_dot_prod(v)
     N = size(v, 1)
-    return [v[:, 1].*speye(N) v[:,2].*speye(N)]
+    return [v[:, 1].*SA.sparse(SA.I, N, N) v[:,2].*SA.sparse(SA.I, N, N)]
 end
 
 """

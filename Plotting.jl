@@ -1,8 +1,11 @@
+__precompile__(false)
 module Plotting
+
+import Printf
 
 import PyPlot
 import PyCall
-PyCall.@pyimport matplotlib.animation as animation
+animation = PyCall.pywrap(PyCall.pyimport("matplotlib.animation"))
 
 import CellSimCommon
 import Centrosome
@@ -11,11 +14,13 @@ import Wall
 import Utils
 
 function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellSimCommon.Flags)
+
     PyPlot.ion()
 
     x = coords.x
 
     fig = PyPlot.figure(figsize=(12.8, 10))
+
     PyPlot.show()
     # figManager = PyPlot.get_current_fig_manager()
     # figManager[:window][:showMaximized]()
@@ -27,7 +32,6 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 
         line = ax[:plot](x[:,1], x[:,2], ".-", zorder=20)[1]
         polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
-
 
         ax[:scatter](x[:,1], x[:,2], color="black", zorder=30) # drag force
         ax[:plot](x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1] # initial condition
@@ -49,7 +53,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
         end
 
         if F.circular_wall
-            y = collect(linspace(-1, 1, 1000))
+            y = collect(range(-1; stop=1, length=1000))
             wall_1 = Wall.compute_walls(y, P, F)
             wall_2 = Wall.compute_walls(y, P, F; right=true)
             ax[:plot](wall_1[:,1], wall_1[:,2], wall_2[:,1], wall_2[:,2], color="black", lw=0.5)
@@ -58,7 +62,8 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
             levelset_2 = Wall.compute_walls(y, P, F, 2e-4; right=true)
             ax[:plot](levelset_1[:,1], levelset_1[:,2], levelset_2[:,1], levelset_2[:,2], color="red", lw=0.5)
         else
-            y = collect(linspace(-40, 40, 1000))
+
+            y = collect(range(-40; stop=40, length=1000))
             wall = Wall.compute_walls(y, P, F)
             ax[:plot](wall[:,1], wall[:,2], -wall[:,1], wall[:,2], color="black", lw=0.5)
             levelset = Wall.compute_walls(y, P, F, 2e-4)
@@ -95,7 +100,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
         end
 
         if F.circular_wall
-            y = collect(linspace(-1, 1, 1000))
+            y = collect(range(-1; stop=1, length=1000))
             wall_1 = Wall.compute_walls(y, P, F)
             wall_2 = Wall.compute_walls(y, P, F; right=true)
             ax[:plot](wall_1[:,2], wall_1[:,1], wall_2[:,2], wall_2[:,1], color="black", lw=0.5)
@@ -104,7 +109,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
             levelset_2 = Wall.compute_walls(y, P, F, 2e-4; right=true)
             ax[:plot](levelset_1[:,2], levelset_1[:,1], levelset_2[:,2], levelset_2[:,1], color="red", lw=0.5)
         else
-            y = collect(linspace(-40, 40, 1000))
+            y = collect(range(-40; stop=40, length=1000))
             wall = Wall.compute_walls(y, P, F)
             ax[:plot](wall[:,1], wall[:,2], -wall[:,1], wall[:,2], color="black", lw=0.5)
             levelset = Wall.compute_walls(y, P, F, 2e-4)
@@ -150,7 +155,7 @@ function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params
     else
         prefix = ""
     end
-    ax[:set_title](@sprintf("%s N: %d, iter: %d, T=%fs", prefix, P.N, k, k*P.δt))
+    ax[:set_title](Printf.@sprintf("%s N: %d, iter: %d, T=%fs", prefix, P.N, k, k*P.δt))
 
     lines = ax[:lines]
     scatters = ax[:collections]
@@ -195,7 +200,7 @@ function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params
 
         scatters[idx_s][:set_offsets](x)
         scatters[idx_s][:set_sizes](0e4*plotables.mass_source)
-        colors = Array{String}(size(x, 1))
+        colors = Array{String}(undef, size(x, 1))
         fill!(colors, "red")
         x_max, x_max_idx = findmax(x[:,2])
         colors[x_max_idx] = "yellow"
@@ -262,7 +267,7 @@ function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params
         scatters[1][:set_sizes](0CellSimCommon.@entry_norm(plotables.drag_force))
     end
     scatters[1][:set_facecolor](Utils.scale_cm(plotables.mass_source, PyPlot.get_cmap("RdYlGn");
-                                               range_min=Nullable(-P.c), range_max=Nullable(P.c)))
+                                               range_min=-P.c, range_max=P.c))
 
 
     PyPlot.draw()

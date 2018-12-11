@@ -4,6 +4,7 @@ import CellSimCommon
 import Cortex
 import Wall
 import Masks
+
 import Plotting
 
 import Centrosome
@@ -15,13 +16,19 @@ import EvenParam
 import NLsolve
 
 import YAML
+import Dates
+
+import DelimitedFiles: readdlm, writedlm
+
+import SparseArrays
+const SA = SparseArrays
 
 macro eval_if_string(s)
-    return esc(:(isa($s, String) ? eval(parse($s)) : $s))
+    return esc(:(isa($s, String) ? eval(Meta.parse($s)) : $s))
 end
 
 function compute_initial_x(P::CellSimCommon.Params, F::CellSimCommon.Flags; convex::Bool=true)
-    t = linspace(0, 1, P.N+1)[1:P.N]
+    t = collect(range(0; stop=1, length=P.N+1))[1:P.N]
 
     if convex
         if !F.circular_wall
@@ -135,27 +142,25 @@ function main()
     )
 
     println("Parameters:")
-    for s in fieldnames(P)
+    for s in fieldnames(typeof(P))
         println(string("    ", s, ": ", getfield(P, s)))
     end
     println("")
 
     println("Flags:")
-    for s in fieldnames(F)
+    for s in fieldnames(typeof(F))
         println(string("    ", s, ": ", getfield(F, s)))
     end
     println(" ")
-
-    CellSimCommon.init(P.N)
 
     plotables = CellSimCommon.new_plotables(P.N)
 
     if haskey(yaml_config, "load_state")
         load_state = yaml_config["load_state"]
         if yaml_config["load_state"]["do_load"]
-            x_init = readcsv(load_state["filename"])
+            x_init = readdlm(load_state["filename"], ',')
             if load_state["do_recenter"]
-                x_init .-= sum(x_init, 1)/size(x_init, 1)
+                x_init .-= sum(x_init; dims=1)/size(x_init, 1)
                 #x_init[:,1] *= P.x0_a/abs(maximum(x_init[:,1]))
                 #x_init[:,2] *= P.x0_b/abs(maximum(x_init[:,2]))
             end
@@ -165,7 +170,7 @@ function main()
             # end
 
             if load_state["do_resample"]
-                x_init = EvenParam.reparam(x_init, true, P.N)
+                x_init = EvenParam.reparam(x_init; closed=true, new_N=P.N)
             end
 
             if !Utils.check_ccw_polygon(x_init)
@@ -192,7 +197,7 @@ function main()
         coords.centro_x[:] = readcsv(load_state["filename_centro"])
     else
         # otherwise, pick the centrosome location as the initial center of mass
-        coords.centro_x[:] = sum(x_init, 1)/size(x_init,1)
+        coords.centro_x[:] = sum(x_init; dims=1)/size(x_init,1)
     end
 
     fig = Plotting.init_plot(coords, P, F)
@@ -209,7 +214,7 @@ function main()
         resi_solver = NLsolve.DifferentiableSparseMultivariateFunction(resi, resi_J)
     else
         r_x = zeros(2P.N)
-        Jr_x = spzeros(2P.N,2P.N)
+        Jr_x = SA.spzeros(2P.N,2P.N)
         if !F.centrosome
             δx = zeros(2P.N)
         else
@@ -253,8 +258,8 @@ function main()
 
                 x .+= reshape(δx[1:2P.N], P.N, 2)
 
-                coords.centro_x[:] += δx[(2P.N+1):(2P.N+2)]
-                coords.centro_angle[:] += δx[2P.N+3]
+                coords.centro_x .+= δx[(2P.N+1):(2P.N+2)]
+                coords.centro_angle .+= δx[2P.N+3]
             else
                 δx[:] = -Jr_x\r_x
                 x .+= + reshape(δx, P.N, 2)
@@ -262,6 +267,7 @@ function main()
         end
 
         # plot
+        # plot_period = F.write_animation ? 1 : 1
         plot_period = F.write_animation ? 1 : 10
         if (F.plot & (k % plot_period == 0))
             Plotting.update_plot(coords, k, P, F, false, plotables, centro_vr)
@@ -272,10 +278,10 @@ function main()
             long_speed = (height - prev_height) / (plot_period*P.δt)
             prev_height = height
             # println("Long. speed: ", long_speed)
-
         end
-        writecsv(".last_x.csv", coords.x)
-        writecsv(".last_centro_x.csv", coords.centro_x')
+
+        writedlm(".last_x.csv", coords.x, ',')
+        writedlm(".last_centro_x.csv", coords.centro_x', ',')
 
         l2_norm = sqrt(sum(abs2, x))
 

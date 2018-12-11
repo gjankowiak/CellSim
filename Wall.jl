@@ -4,6 +4,9 @@ using CellSimCommon
 
 export compute_field, compute_walls, check_OOB
 
+import SparseArrays
+const SA = SparseArrays
+
 """
 The wall is implemented using a penalization method
 The corresponding potential is computed as
@@ -30,7 +33,7 @@ with this notation,
 
 macro pulse_init(x)
     return esc(quote
-           const σω0 = P.f_σ*P.f_ω0
+           σω0 = P.f_σ*P.f_ω0
            pulse = sin.(σω0*$x)
        end)
 end
@@ -61,15 +64,15 @@ end
 # return esc(:(tan.(pi/2*($y))/$α)) # atan
 
 function g(x::Vector{Float64}, α::Float64)
-    return -min.(α*x-1, 0.0).^2 .* log.(α*x)
+    return -min.(α*x.-1, 0.0).^2 .* log.(α*x)
 end
 
 function g_p(x::Vector{Float64}, α::Float64)
-    return -(2α*min.(α*x-1, 0.0).*log.(α*x) + min.(α*x-1, 0.0).^2./x)
+    return -(2α*min.(α*x.-1, 0.0).*log.(α*x) .+ min.(α*x.-1, 0.0).^2 ./x)
 end
 
 function g_pp(x::Vector{Float64}, α::Float64)
-    return -(2α^2*(x.<(1/α)).*log.(α*x) + 4α*min.(α*x-1, 0.0)./x - min.(α*x-1, 0.0).^2./x.^2)
+    return -(2α^2*(x.<(1/α)).*log.(α*x) .+ 4α*min.(α*x.-1, 0.0)./x .- min.(α*x.-1, 0.0).^2 ./x.^2)
 end
 
 macro potential_thres()
@@ -85,15 +88,15 @@ function compute_walls(y::Vector, P::Params, F::Flags, levelset::Float64=0.0; ri
     end
     if levelset == 0.0
         if F.circular_wall
-            return inv_polar_projection([(1-2*right)*(-P.f_β*pulse-P.f_width)+P.polar_shift y], P)
+            return inv_polar_projection([(1 .-2*right)*(-P.f_β*pulse.-P.f_width).+P.polar_shift y], P)
         else
-            return [(1-2*right)*(-P.f_β*pulse-P.f_width) y]
+            return [(1 .-2*right)*(-P.f_β*pulse.-P.f_width) y]
         end
     else
         if F.circular_wall
-            return inv_polar_projection([(1-2*right)*(-P.f_β*pulse-P.f_width+1/α)+P.polar_shift y], P)
+            return inv_polar_projection([(1 .-2*right)*(-P.f_β*pulse .- P.f_width.+1 ./α).+P.polar_shift y], P)
         else
-            return [(1-2*right)*(-P.f_β*pulse-P.f_width+1/α) y]
+            return [(1 .-2*right)*(-P.f_β*pulse.-P.f_width.+1 ./α) y]
         end
     end
 end
@@ -111,7 +114,7 @@ function compute_field(x::Matrix, P::Params, F::Flags; gradient::Bool=true, hess
     α = P.f_α
     β = P.f_β
     if α == 0
-        return zeros(N), zeros(N, 2), spzeros(2N, 2N)
+        return zeros(N), zeros(N, 2), SA.spzeros(2N, 2N)
     end
     @pulse_init(virt_x[:,2])
     @dpulse_init(virt_x[:,2])
@@ -120,33 +123,33 @@ function compute_field(x::Matrix, P::Params, F::Flags; gradient::Bool=true, hess
         @dpulse_step(virt_x[:,2])
     end
 
-    x_right  = max.(1e-25, + P.f_width + β*pulse - virt_x[:,1])
-    x_left = max.(1e-25, + P.f_width + β*pulse + virt_x[:,1])
+    x_right  = max.(1e-25, + P.f_width .+ β*pulse .- virt_x[:,1])
+    x_left = max.(1e-25, + P.f_width .+ β*pulse .+ virt_x[:,1])
     f_right  = g(x_right, α)
     f_left = g(x_left, α)
-    local f = f_right + f_left
+    local f = f_right .+ f_left
 
     if gradient
-        ∇f = [g_p(x_left, α)-g_p(x_right, α) β*dpulse.*(g_p(x_right, α)+g_p(x_left, α))]
+        ∇f = [g_p(x_left, α).-g_p(x_right, α) β*dpulse.*(g_p(x_right, α).+g_p(x_left, α))]
         if hessian
-            DN = β*dpulse.*(g_pp(x_left, α)-g_pp(x_right, α))
-            D0 = [g_pp(x_right, α)+g_pp(x_left, α) (β*d2pulse.*(g_p(x_right, α)+g_p(x_left, α))+β^2*dpulse.^2.*(g_pp(x_right, α)+g_pp(x_left, α)))]
-            H = spdiagm((DN, D0, DN), (-N, 0, N), 2N, 2N)
+            DN = β*dpulse.*(g_pp(x_left, α).-g_pp(x_right, α))
+            D0 = [g_pp(x_right, α).+g_pp(x_left, α); (β*d2pulse.*(g_p(x_right, α).+g_p(x_left, α)).+β^2*dpulse.^2 .*(g_pp(x_right, α).+g_pp(x_left, α)))]
+            H = SA.spdiagm(-N => DN, 0 => D0, N => DN)
             if F.circular_wall
-                M∇f1 = spdiagm((∇f[:,1], [∇f[:,1] ∇f[:,1]], ∇f[:,1]), (-N, 0, N), 2N, 2N)
-                M∇f2 = spdiagm((∇f[:,2], [∇f[:,2] ∇f[:,2]], ∇f[:,2]), (-N, 0, N), 2N, 2N)
-                return f, reshape(DTx'*vec(∇f), N, 2), DTx'*H'*DTx + M∇f1.*HT1x + M∇f2.*HT2x
+                M∇f1 = SA.spdiagm(-N => ∇f[:,1], 0 => [∇f[:,1]; ∇f[:,1]], N => ∇f[:,1])
+                M∇f2 = SA.spdiagm(-N => ∇f[:,2], 0 => [∇f[:,2]; ∇f[:,2]], N => ∇f[:,2])
+                return f, reshape(DTx'*vec(∇f), N, 2), DTx'*H'*DTx .+ M∇f1.*HT1x .+ M∇f2.*HT2x
             else
                 return f, ∇f, H
             end
         end
         if F.circular_wall
-            return prefac*f, prefac*reshape(DTx'*vec(∇f), N, 2), prefac*spzeros(2N, 2N)
+            return prefac*f, prefac*reshape(DTx'*vec(∇f), N, 2), prefac*SA.spzeros(2N, 2N)
         else
-            return prefac*f, prefac*∇f, prefac*spzeros(2N, 2N)
+            return prefac*f, prefac*∇f, prefac*SA.spzeros(2N, 2N)
         end
     end
-    return prefac*f, Matrix(0, 0), spzeros(2N, 2N)
+    return prefac*f, Matrix(0, 0), SA.spzeros(2N, 2N)
 end
 
 function check_OOB(x::Matrix, P::Dict{String,Float64})
@@ -155,19 +158,25 @@ function check_OOB(x::Matrix, P::Dict{String,Float64})
     for i = 2_Int(P.f_nk)
         @pulse_step(x[:,2])
     end
-    x_right  = - P.f_width - P.f_β*pulse + x[:,1]
-    x_left = - P.f_width - P.f_β*pulse - x[:,1]
+    x_right  = - P.f_width .- P.f_β*pulse .+ x[:,1]
+    x_left = - P.f_width .- P.f_β*pulse .- x[:,1]
     return (x_right .< 1e-15) | (x_left .< 1e-15)
 end
 
 function polar_projection(x::Matrix, P::Params)
     ymax = 1.0
     N = P.N
-    r = sqrt.(sum(abs2, x, 2))
-    Tx = [r-P.polar_shift ymax/pi*atan.(x[:,2]./(r+x[:,1]))]
-    DTx =  spdiagm((-ymax/(2π)*x[:,2]./r.^2, [x[:,1]./r ymax/(2π)*x[:,1]./r.^2], x[:,2]./r), (-N, 0, N), 2N, 2N)
-    HT1x = spdiagm((x[:,1].*x[:,2]./r.^1.5, [x[:,2].^2./r.^1.5 x[:,1].^2./r.^1.5], x[:,1].*x[:,2]./r.^1.5), (-N, 0, N), 2N, 2N)
-    HT2x = spdiagm(((x[:,2].^2-x[:,1].^2)./r.^4, [-x[:,1].*x[:,2]./r.^4 x[:,1].*x[:,2]./r.^4], (x[:,2].^2-x[:,1].^2)./r.^4), (-N, 0, N), 2N, 2N).*ymax/π
+    r = vec(sqrt.(sum(abs2, x; dims=2)))
+    Tx = [r.-P.polar_shift ymax/pi*atan.(x[:,2]./(r.+x[:,1]))]
+    DTx =  SA.spdiagm(-N => -ymax/(2π)*x[:,2]./r.^2,
+                       0 => [x[:,1]./r; ymax/(2π)*x[:,1]./r.^2],
+                       N => x[:,2]./r)
+    HT1x = SA.spdiagm(-N => x[:,1].*x[:,2]./r.^1.5,
+                       0 => [x[:,2].^2 ./r.^1.5; x[:,1].^2 ./r.^1.5],
+                       N => x[:,1].*x[:,2]./r.^1.5)
+    HT2x = SA.spdiagm(-N => (x[:,2].^2 .-x[:,1].^2)./r.^4,
+                       0 => [-x[:,1].*x[:,2]./r.^4; x[:,1].*x[:,2]./r.^4],
+                       N => (x[:,2].^2 .-x[:,1].^2)./r.^4).*ymax/π
     return (Tx, DTx, (HT1x, HT2x))
 end
 

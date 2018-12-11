@@ -3,13 +3,13 @@ module Masks
 using CellSimCommon
 
 function compute_drag_mask(x::Array, half_w::Int, pow::Float64=2.0)
-    const N = size(x, 1)
+    N = size(x, 1)
 
-    const x_min, x_min_idx = findmin(view(x,:,2))
-    const x_max, x_max_idx = findmax(view(x,:,2))
+    x_min, x_min_idx = findmin(view(x,:,2))
+    x_max, x_max_idx = findmax(view(x,:,2))
 
     mask = zeros(N)
-    profile = exp(-linspace(-3, 3, 2*half_w+1).^pow)
+    profile = exp(-collect(range(-3; stop=3, length=2*half_w+1)).^pow)
     profile .*= 0.5/sum(profile)
 
     CellSimCommon.@looped(mask, x_min_idx-half_w, x_min_idx+half_w) = profile
@@ -19,10 +19,10 @@ function compute_drag_mask(x::Array, half_w::Int, pow::Float64=2.0)
 end
 
 function compute_drag_mask(x::Array, ΔL::Array, half_w::Float64, pow::Float64=2.0)
-    const N = size(x, 1)
+    N = size(x, 1)
 
-    const x_min, x_min_idx = findmin(view(x,:,2))
-    const x_max, x_max_idx = findmax(view(x,:,2))
+    x_min, x_min_idx = findmin(view(x,:,2))
+    x_max, x_max_idx = findmax(view(x,:,2))
 
     dst_from_min = split_cumsum(ΔL, x_min_idx)
     dst_from_max = split_cumsum(ΔL, x_max_idx)
