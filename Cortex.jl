@@ -352,6 +352,12 @@ end
 function compute_pressure_force(coords::PointCoords, P::Params,
                                 dst_f::Vector{Float64},
                                 add::Bool=false)
+
+    w = open("dump_pressure_f_1.0.txt", "w")
+    tmp = -P.P*D1c_perp*vec(coords.x)
+    show(w, "text/plain", tmp)
+    write(w, "\n")
+
     if add
         copyto!(dst_f, dst_f .- P.P*D1c_perp*vec(coords.x))
     else
@@ -361,6 +367,12 @@ end
 function compute_pressure_force(coords::PointCoords, P::Params,
                                 dst_Df::SA.SparseMatrixCSC{Float64},
                                 add::Bool=false)
+
+    w = open("dump_pressure_Df_1.0.txt", "w")
+    tmp = -P.P*D1c_perp
+    show(w, "text/plain", tmp)
+    write(w, "\n")
+
     if add
         dst_Df[:] = dst_Df .- P.P*D1c_perp
     else
@@ -372,6 +384,12 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
                                P::Params, diffs::Differentials,
                                dst_f::Vector{Float64},
                                add::Bool=false)
+
+    w = open("dump_elastic_f_1.0.txt", "w")
+    tmp = P.K * (coords.ell.*coords.τ .- coords_s.ell_m.*coords_s.τ_m)/P.Δσ
+    show(w, "text/plain", tmp)
+    write(w, "\n")
+
     if add
         copyto!(dst_f, dst_f .+ vec(P.K * (coords.ell.*coords.τ .- coords_s.ell_m.*coords_s.τ_m)/P.Δσ))
     else
@@ -382,6 +400,14 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
                                P::Params, diffs::Differentials,
                                dst_Df::SA.SparseMatrixCSC{Float64},
                                add::Bool=false)
+
+    w = open("dump_elastic_Df_1.0.txt", "w")
+    tmp = P.K * (CSC.pointwise_projection(coords.τ)*D1p .- CSC.pointwise_projection(coords_s.τ_m)*D1m
+                           .+ (CSC.@bc_scalar(coords.ell).*diffs.Dτ .- CSC.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
+                          )/P.Δσ
+    show(w, "text/plain", tmp)
+    write(w, "\n")
+
     if add
         dst_Df[:] = dst_Df .+ P.K * (CSC.pointwise_projection(coords.τ)*D1p .- CSC.pointwise_projection(coords_s.τ_m)*D1m
                          .+ (CSC.@bc_scalar(coords.ell).*diffs.Dτ .- CSC.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
@@ -401,6 +427,12 @@ function compute_confinement_force(coords::PointCoords,
     if weighted
         copyto!(∇field, coords.Δ2L.*∇field/2P.Δσ)
     end
+
+    w = open("dump_confinement_f_1.0.txt", "w")
+    tmp = vec(-∇field)
+    show(w, "text/plain", tmp)
+    write(w, "\n")
+
     if add
         copyto!(dst_f, dst_f .+ vec(-∇field))
     else
@@ -420,6 +452,12 @@ function compute_confinement_force(coords::PointCoords,
                 [D1c_short_unorm.*coords.τc[:,1] D1c_short_unorm.*coords.τc[:,2]]])
         H_field = (CSC.@bc_scalar(coords.Δ2L).*H_field .+ vec(∇field).*aux)/2P.Δσ
     end
+
+    w = open("dump_confinement_Df_1.0.txt", "w")
+    tmp = - H_field
+    show(w, "text/plain", tmp)
+    write(w, "\n")
+
     if add
         dst_Df[:] = dst_Df .- H_field
     else
