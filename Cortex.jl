@@ -607,6 +607,8 @@ function compute_residuals(x::Vector{Float64},
     update_coords(inner_coords, P, reshape(x, (P.N, 2)))
     differentials = new_Differentials(inner_coords, inner_coords_s)
 
+    CellSimCommon.dump_struct(inner_coords, "dump_inner_coords_1.0.txt")
+
     fill!(dst, 0.0)
 
     compute_pressure_force(inner_coords, P, dst, true)

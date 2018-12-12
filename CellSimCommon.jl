@@ -5,6 +5,16 @@ export Params, Flags
 import SparseArrays
 const SA = SparseArrays
 
+function dump_struct(s, filename)
+    dump = open(filename, "w")
+    for f in fieldnames(typeof(s))
+        write(dump, string(f, "\n"))
+        show(dump, "text/plain", getfield(s, f))
+        write(dump, "\n\n")
+    end
+    close(dump)
+end
+
 struct CircIdx
     m1::Array{Int64,1}
     m2::Array{Int64,1}
