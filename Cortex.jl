@@ -1,5 +1,7 @@
 module Cortex
 
+const DEBUG = "DEBUG" in keys(ENV)
+
 using CellSimCommon
 
 const CSC = CellSimCommon
@@ -229,97 +231,101 @@ function init_FD_matrices(P::Params)
     global D5        = SA.blockdiag(D5_short, D5_short)
     global D5_perp  = ([[SA.spzeros(N,N) -D5_short];[D5_short SA.spzeros(N,N)]])
 
-    dump = open("dump_finite_differences_matrices_1.0.txt", "w")
+    if DEBUG
+        dump = open("dump_finite_differences_matrices_1.0.txt", "w")
 
-    write(dump, "M_perp\n")
-    show(dump, "text/plain", M_perp)
-    write(dump, "\n")
-    write(dump, "M_cs_plus\n")
-    show(dump, "text/plain", M_cs_plus)
-    write(dump, "\n")
-    write(dump, "M_cs_minus\n")
-    show(dump, "text/plain", M_cs_minus)
-    write(dump, "\n")
+        write(dump, "M_perp\n")
+        show(dump, "text/plain", M_perp)
+        write(dump, "\n")
+        write(dump, "M_cs_plus\n")
+        show(dump, "text/plain", M_cs_plus)
+        write(dump, "\n")
+        write(dump, "M_cs_minus\n")
+        show(dump, "text/plain", M_cs_minus)
+        write(dump, "\n")
 
-    write(dump, "D1p_unorm\n")
-    show(dump, "text/plain", D1p_unorm)
-    write(dump, "\n")
-    write(dump, "D1p\n")
-    show(dump, "text/plain", D1p)
-    write(dump, "\n")
-    write(dump, "D1m\n")
-    show(dump, "text/plain", D1m)
-    write(dump, "\n")
+        write(dump, "D1p_unorm\n")
+        show(dump, "text/plain", D1p_unorm)
+        write(dump, "\n")
+        write(dump, "D1p\n")
+        show(dump, "text/plain", D1p)
+        write(dump, "\n")
+        write(dump, "D1m\n")
+        show(dump, "text/plain", D1m)
+        write(dump, "\n")
 
-    write(dump, "D1p_perp_unorm\n")
-    show(dump, "text/plain", D1p_perp_unorm)
-    write(dump, "\n")
-    write(dump, "D1p_perp\n")
-    show(dump, "text/plain", D1p_perp)
-    write(dump, "\n")
+        write(dump, "D1p_perp_unorm\n")
+        show(dump, "text/plain", D1p_perp_unorm)
+        write(dump, "\n")
+        write(dump, "D1p_perp\n")
+        show(dump, "text/plain", D1p_perp)
+        write(dump, "\n")
 
-    write(dump, "D1m_perp\n")
-    show(dump, "text/plain", D1m_perp)
-    write(dump, "\n")
+        write(dump, "D1m_perp\n")
+        show(dump, "text/plain", D1m_perp)
+        write(dump, "\n")
 
-    write(dump, "D1c_short_unorm\n")
-    show(dump, "text/plain", D1c_short_unorm)
-    write(dump, "\n")
-    write(dump, "D1c_unorm\n")
-    show(dump, "text/plain", D1c_unorm)
-    write(dump, "\n")
-    write(dump, "D1c_perp_unorm\n")
-    show(dump, "text/plain", D1c_perp_unorm)
-    write(dump, "\n")
-    write(dump, "D1c_short\n")
-    show(dump, "text/plain", D1c_short)
-    write(dump, "\n")
-    write(dump, "D1c\n")
-    show(dump, "text/plain", D1c)
-    write(dump, "\n")
-    write(dump, "D1c_perp\n")
-    show(dump, "text/plain", D1c_perp)
-    write(dump, "\n")
+        write(dump, "D1c_short_unorm\n")
+        show(dump, "text/plain", D1c_short_unorm)
+        write(dump, "\n")
+        write(dump, "D1c_unorm\n")
+        show(dump, "text/plain", D1c_unorm)
+        write(dump, "\n")
+        write(dump, "D1c_perp_unorm\n")
+        show(dump, "text/plain", D1c_perp_unorm)
+        write(dump, "\n")
+        write(dump, "D1c_short\n")
+        show(dump, "text/plain", D1c_short)
+        write(dump, "\n")
+        write(dump, "D1c\n")
+        show(dump, "text/plain", D1c)
+        write(dump, "\n")
+        write(dump, "D1c_perp\n")
+        show(dump, "text/plain", D1c_perp)
+        write(dump, "\n")
 
-    write(dump, "D2_short\n")
-    show(dump, "text/plain", D2_short)
-    write(dump, "\n")
-    write(dump, "D2\n")
-    show(dump, "text/plain", D2)
-    write(dump, "\n")
-    write(dump, "D2_perp\n")
-    show(dump, "text/plain", D2_perp)
-    write(dump, "\n")
+        write(dump, "D2_short\n")
+        show(dump, "text/plain", D2_short)
+        write(dump, "\n")
+        write(dump, "D2\n")
+        show(dump, "text/plain", D2)
+        write(dump, "\n")
+        write(dump, "D2_perp\n")
+        show(dump, "text/plain", D2_perp)
+        write(dump, "\n")
 
-    write(dump, "D3_short\n")
-    show(dump, "text/plain", D3_short)
-    write(dump, "\n")
-    write(dump, "D3\n")
-    show(dump, "text/plain", D3)
-    write(dump, "\n")
-    write(dump, "D3_perp\n")
-    show(dump, "text/plain", D3_perp)
-    write(dump, "\n")
+        write(dump, "D3_short\n")
+        show(dump, "text/plain", D3_short)
+        write(dump, "\n")
+        write(dump, "D3\n")
+        show(dump, "text/plain", D3)
+        write(dump, "\n")
+        write(dump, "D3_perp\n")
+        show(dump, "text/plain", D3_perp)
+        write(dump, "\n")
 
-    write(dump, "D4_short\n")
-    show(dump, "text/plain", D4_short)
-    write(dump, "\n")
-    write(dump, "D4\n")
-    show(dump, "text/plain", D4)
-    write(dump, "\n")
-    write(dump, "D4_perp\n")
-    show(dump, "text/plain", D4_perp)
-    write(dump, "\n")
+        write(dump, "D4_short\n")
+        show(dump, "text/plain", D4_short)
+        write(dump, "\n")
+        write(dump, "D4\n")
+        show(dump, "text/plain", D4)
+        write(dump, "\n")
+        write(dump, "D4_perp\n")
+        show(dump, "text/plain", D4_perp)
+        write(dump, "\n")
 
-    write(dump, "D5_short\n")
-    show(dump, "text/plain", D5_short)
-    write(dump, "\n")
-    write(dump, "D5\n")
-    show(dump, "text/plain", D5)
-    write(dump, "\n")
-    write(dump, "D5_perp\n")
-    show(dump, "text/plain", D5_perp)
-    write(dump, "\n")
+        write(dump, "D5_short\n")
+        show(dump, "text/plain", D5_short)
+        write(dump, "\n")
+        write(dump, "D5\n")
+        show(dump, "text/plain", D5)
+        write(dump, "\n")
+        write(dump, "D5_perp\n")
+        show(dump, "text/plain", D5_perp)
+        write(dump, "\n")
+
+        close(dump)
+    end
 end
 
 function compute_front_back(coords::PointCoords, P::Params, F::Flags)
@@ -353,10 +359,13 @@ function compute_pressure_force(coords::PointCoords, P::Params,
                                 dst_f::Vector{Float64},
                                 add::Bool=false)
 
-    w = open("dump_pressure_f_1.0.txt", "w")
-    tmp = -P.P*D1c_perp*vec(coords.x)
-    show(w, "text/plain", tmp)
-    write(w, "\n")
+    if DEBUG
+        w = open("dump_pressure_f_1.0.txt", "w")
+        tmp = -P.P*D1c_perp*vec(coords.x)
+        show(w, "text/plain", tmp)
+        write(w, "\n")
+        close(w)
+    end
 
     if add
         copyto!(dst_f, dst_f .- P.P*D1c_perp*vec(coords.x))
@@ -368,10 +377,14 @@ function compute_pressure_force(coords::PointCoords, P::Params,
                                 dst_Df::SA.SparseMatrixCSC{Float64},
                                 add::Bool=false)
 
-    w = open("dump_pressure_Df_1.0.txt", "w")
-    tmp = -P.P*D1c_perp
-    show(w, "text/plain", tmp)
-    write(w, "\n")
+    if DEBUG
+        w = open("dump_pressure_Df_1.0.txt", "w")
+        tmp = -P.P*D1c_perp
+        show(w, "text/plain", tmp)
+        write(w, "\n")
+        close(w)
+    end
+
 
     if add
         dst_Df[:] = dst_Df .- P.P*D1c_perp
@@ -385,10 +398,13 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
                                dst_f::Vector{Float64},
                                add::Bool=false)
 
-    w = open("dump_elastic_f_1.0.txt", "w")
-    tmp = P.K * (coords.ell.*coords.τ .- coords_s.ell_m.*coords_s.τ_m)/P.Δσ
-    show(w, "text/plain", tmp)
-    write(w, "\n")
+    if DEBUG
+        w = open("dump_elastic_f_1.0.txt", "w")
+        tmp = P.K * (coords.ell.*coords.τ .- coords_s.ell_m.*coords_s.τ_m)/P.Δσ
+        show(w, "text/plain", tmp)
+        write(w, "\n")
+        close(w)
+    end
 
     if add
         copyto!(dst_f, dst_f .+ vec(P.K * (coords.ell.*coords.τ .- coords_s.ell_m.*coords_s.τ_m)/P.Δσ))
@@ -401,12 +417,15 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
                                dst_Df::SA.SparseMatrixCSC{Float64},
                                add::Bool=false)
 
-    w = open("dump_elastic_Df_1.0.txt", "w")
-    tmp = P.K * (CSC.pointwise_projection(coords.τ)*D1p .- CSC.pointwise_projection(coords_s.τ_m)*D1m
-                           .+ (CSC.@bc_scalar(coords.ell).*diffs.Dτ .- CSC.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
-                          )/P.Δσ
-    show(w, "text/plain", tmp)
-    write(w, "\n")
+    if DEBUG
+        w = open("dump_elastic_Df_1.0.txt", "w")
+        tmp = P.K * (CSC.pointwise_projection(coords.τ)*D1p .- CSC.pointwise_projection(coords_s.τ_m)*D1m
+                               .+ (CSC.@bc_scalar(coords.ell).*diffs.Dτ .- CSC.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
+                              )/P.Δσ
+        show(w, "text/plain", tmp)
+        write(w, "\n")
+        close(w)
+    end
 
     if add
         dst_Df[:] = dst_Df .+ P.K * (CSC.pointwise_projection(coords.τ)*D1p .- CSC.pointwise_projection(coords_s.τ_m)*D1m
@@ -428,10 +447,13 @@ function compute_confinement_force(coords::PointCoords,
         copyto!(∇field, coords.Δ2L.*∇field/2P.Δσ)
     end
 
-    w = open("dump_confinement_f_1.0.txt", "w")
-    tmp = vec(-∇field)
-    show(w, "text/plain", tmp)
-    write(w, "\n")
+    if DEBUG
+        w = open("dump_confinement_f_1.0.txt", "w")
+        tmp = vec(-∇field)
+        show(w, "text/plain", tmp)
+        write(w, "\n")
+        close(w)
+    end
 
     if add
         copyto!(dst_f, dst_f .+ vec(-∇field))
@@ -453,10 +475,13 @@ function compute_confinement_force(coords::PointCoords,
         H_field = (CSC.@bc_scalar(coords.Δ2L).*H_field .+ vec(∇field).*aux)/2P.Δσ
     end
 
-    w = open("dump_confinement_Df_1.0.txt", "w")
-    tmp = - H_field
-    show(w, "text/plain", tmp)
-    write(w, "\n")
+    if DEBUG
+        w = open("dump_confinement_Df_1.0.txt", "w")
+        tmp = - H_field
+        show(w, "text/plain", tmp)
+        write(w, "\n")
+        close(w)
+    end
 
     if add
         dst_Df[:] = dst_Df .- H_field
@@ -607,7 +632,9 @@ function compute_residuals(x::Vector{Float64},
     update_coords(inner_coords, P, reshape(x, (P.N, 2)))
     differentials = new_Differentials(inner_coords, inner_coords_s)
 
-    CellSimCommon.dump_struct(inner_coords, "dump_inner_coords_1.0.txt")
+    if DEBUG
+        CellSimCommon.dump_struct(inner_coords, "dump_inner_coords_1.0.txt")
+    end
 
     fill!(dst, 0.0)
 
