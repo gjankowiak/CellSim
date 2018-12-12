@@ -295,7 +295,7 @@ function main()
         writer[:finish]()
     end
     println("Finished, type Enter to exit")
-    read(STDIN, 1)
+    read(stdin, 1)
     # output
 end
 
