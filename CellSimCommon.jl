@@ -16,8 +16,8 @@ function dump_struct(s, filename)
 end
 
 struct CircIdx
-    m1::Array{Int64,1}
     m2::Array{Int64,1}
+    m1::Array{Int64,1}
     p1::Array{Int64,1}
     p2::Array{Int64,1}
 end
