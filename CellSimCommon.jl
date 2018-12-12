@@ -32,23 +32,24 @@ function init_circ_idx(N::Int64)
 end
 
 struct Params
-    N::Int64      # number of points
     M::Int64      # max. number of iterations
 
     Δσ::Float64   # space step
     δt::Float64   # time step
 
+    # Cortex related parameters
+    N::Int64      # number of points on the cortex
     P::Float64    # pressure
     K::Float64    # membrane elasticity
     Ka::Float64   # cortex viscosity
     c::Float64    # polymerization speed
 
+    # Initial condition parameters
     x0_a::Float64      # initial ellipsis width
     x0_b::Float64      # initial ellipsis height
     x0_shift::Float64  # initial vertical shift
 
     # Confinement field
-
     f_α::Float64      # sharpness
     f_β::Float64      # depth
     f_ω0::Float64     # pulsation
@@ -66,10 +67,16 @@ struct Params
 
     polar_shift::Float64 # how much to shift the obstacle to the right before polar projection
 
+    # Centrosome related parameters
     k_MT::Float64 # (isotropic) MT/cortex friction coefficient
 
     MT_potential_power::Float64 # α, where the MT force is F_MT = k (Xi-Xc)*|Xi-Xc|^α
     MT_factor::Float64 # the prefactor k in F_MT
+
+    # Nucleus related parameters
+    Nnuc::Int64   # number of points on the nucleus
+    N_kb::Float64 # bending stiffness
+    N_ω::Float64  # inplane stiffness
 end
 
 struct Flags

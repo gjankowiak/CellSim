@@ -81,10 +81,10 @@ function main()
 
     # Parameters
     P = CellSimCommon.Params(
-        @eval_if_string(y_params["N"]),
         y_params["M"],
         1/y_params["N"], # Δσ
         y_params["δt"],
+        @eval_if_string(y_params["N"]),
         @eval_if_string(y_params["P"]),
         @eval_if_string(y_params["K"]),
         @eval_if_string(y_params["Ka"]),
