@@ -75,6 +75,7 @@ struct Params
 
     # Nucleus related parameters
     Nnuc::Int64   # number of points on the nucleus
+    N_P::Float64  # pressure
     N_kb::Float64 # bending stiffness
     N_ω::Float64  # inplane stiffness
 end
@@ -103,6 +104,39 @@ struct Flags
     # output options
     dryrun::Bool
     write_animation::Bool
+end
+
+struct TempArrays6
+    v1::Vector{Float64}
+    v2::Vector{Float64}
+    v3::Vector{Float64}
+    v4::Vector{Float64}
+    v5::Vector{Float64}
+    v6::Vector{Float64}
+end
+
+struct TempArrays12
+    v1::Vector{Float64}
+    v2::Vector{Float64}
+    v3::Vector{Float64}
+    v4::Vector{Float64}
+    v5::Vector{Float64}
+    v6::Vector{Float64}
+    v7::Vector{Float64}
+    v8::Vector{Float64}
+    v9::Vector{Float64}
+    v10::Vector{Float64}
+    v11::Vector{Float64}
+    v12::Vector{Float64}
+end
+
+macro ta6_tuple(ta)
+    return esc(:(($ta.v1, $ta.v2, $ta.v3, $ta.v4, $ta.v5, $ta.v6)))
+end
+
+macro ta12_tuple(ta)
+    return esc(:(($ta.v1, $ta.v2, $ta.v3, $ta.v4, $ta.v5, $ta.v6,
+                  $ta.v7, $ta.v8, $ta.v9, $ta.v10, $ta.v11, $ta.v12)))
 end
 
 struct Plotables
