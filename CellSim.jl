@@ -2,6 +2,7 @@ module CellSim
 
 import CellSimCommon
 import Cortex
+import Nucleus
 import Wall
 import Masks
 
@@ -106,7 +107,14 @@ function main()
         y_params["polar_shift"],
         y_params["k_MT"],
         y_params["MT_potential_power"],
-        y_params["MT_factor"]
+        y_params["MT_factor"],
+        y_params["Nnuc"],
+        y_params["N_P"],
+        y_params["N_kb"],
+        y_params["N_ω"],
+        y_params["N_kc"],
+        y_params["N_l0c"],
+        y_params["N_r_init"]
    )
 
     println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
@@ -124,6 +132,7 @@ function main()
           y_flags["circular_wall"],
           y_flags["cortex"],
           y_flags["centrosome"],
+          y_flags["nucleus"],
           y_flags["weighted_confinement"],
 
           # scheme/solver options
@@ -206,10 +215,24 @@ function main()
         writer[:setup](fig, string(writer[:metadata]["title"], ".mp4"), 100)
     end
 
+    nucleus_coords = missing
+
+    if F.nucleus
+        old_nucleus_coords = Nucleus.initialize_coords(P, F, coords)
+        nucleus_coords = Nucleus.initialize_coords(P, F, coords)
+    end
+
+    potentials = CellSimCommon.InteractionPotentials(
+        zeros(P.Nnuc),
+        zeros(P.Nnuc, 2),
+        zeros(P.N, 2),
+        zeros(1, 2)
+   )
+
     # centrosome buffers and coordinates
     (centro_bufs, centro_vr, centro_qw, centro_pc) = Centrosome.init(P)
 
-    resi, resi_J = Cortex.wrap_residuals(coords, coords_s, P, F, plotables)
+    resi, resi_J = Cortex.wrap_residuals(coords, coords_s, potentials, P, F, plotables)
     if F.innerloop
         resi_solver = NLsolve.DifferentiableSparseMultivariateFunction(resi, resi_J)
     else
@@ -236,41 +259,46 @@ function main()
             Cortex.update_coords(coords, P, x)
         end
 
-        if F.innerloop
-            res = NLsolve.nlsolve(resi_solver, vec(x); method=:newton)
-            x = reshape(res.zero, (P.N, 2))
+        if F.nucleus
+            fill!(potentials.N_W, 0.0)
+            fill!(potentials.N_∇W, 0.0)
+            fill!(potentials.C_∇W, 0.0)
+            fill!(potentials.CS_∇W, 0.0)
+            Nucleus.compute_contact_force(potentials, coords, nucleus_coords, P, F)
+            Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
+            Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F)
+        end
+
+        if F.cortex
+            # cortex evolution
+            resi(vec(x), r_x)
+            resi_J(vec(x), Jr_x)
+
+        end
+
+        if F.centrosome
+            (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables, potentials)
+            # centrosome evolution
+            M = ([[Jr_x+centro_id_comp centro_b_ce'];[centro_b_ce centro_A]])
+
+            rhs = [-r_x+P.δt*centro_b_co_rhs; P.δt*centro_b_ce_rhs]
+
+            δx[:] = M\rhs
+
+            x .+= reshape(δx[1:2P.N], P.N, 2)
+
+            coords.centro_x .+= δx[(2P.N+1):(2P.N+2)]
+            coords.centro_angle .+= δx[2P.N+3]
         else
-            if F.cortex
-                # cortex evolution
-                resi(vec(x), r_x)
-                resi_J(vec(x), Jr_x)
-
-            end
-
-            if F.centrosome
-                (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables)
-                # centrosome evolution
-                M = ([[Jr_x+centro_id_comp centro_b_ce'];[centro_b_ce centro_A]])
-
-                rhs = [-r_x+P.δt*centro_b_co_rhs; P.δt*centro_b_ce_rhs]
-
-                δx[:] = M\rhs
-
-                x .+= reshape(δx[1:2P.N], P.N, 2)
-
-                coords.centro_x .+= δx[(2P.N+1):(2P.N+2)]
-                coords.centro_angle .+= δx[2P.N+3]
-            else
-                δx[:] = -Jr_x\r_x
-                x .+= + reshape(δx, P.N, 2)
-            end
+            δx[:] = -Jr_x\r_x
+            x .+= + reshape(δx, P.N, 2)
         end
 
         # plot
         # plot_period = F.write_animation ? 1 : 1
         plot_period = F.write_animation ? 1 : 10
         if (F.plot & (k % plot_period == 0))
-            Plotting.update_plot(coords, k, P, F, false, plotables, centro_vr)
+            Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
                 writer[:grab_frame]()
             end

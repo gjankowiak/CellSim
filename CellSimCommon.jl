@@ -78,6 +78,9 @@ struct Params
     N_P::Float64  # pressure
     N_kb::Float64 # bending stiffness
     N_ω::Float64  # inplane stiffness
+    N_kc::Float64 # centrosome link stiffness
+    N_l0c::Float64 # centrosome link rest length
+    N_r_init::Float64 # initial nucleus radius
 end
 
 struct Flags
@@ -89,6 +92,7 @@ struct Flags
     circular_wall::Bool
     cortex::Bool
     centrosome::Bool
+    nucleus::Bool
     weighted_confinement::Bool
 
     # scheme/solver options
@@ -104,6 +108,13 @@ struct Flags
     # output options
     dryrun::Bool
     write_animation::Bool
+end
+
+struct InteractionPotentials
+    N_W::Vector{Float64}
+    N_∇W::Matrix{Float64}
+    C_∇W::Matrix{Float64}
+    CS_∇W::Matrix{Float64}
 end
 
 struct TempArrays6

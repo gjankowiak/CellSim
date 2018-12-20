@@ -201,8 +201,10 @@ The full system (cortex + centrosome) is of the form
 [[ M    | b_co ]    (X_co^(n+1))    (b_co_n X_ce^n)
  [ b_ce | A    ]]   (X_ce^(n+1)) =  (b_ce_n X_co^n)
 """
-function assemble_system(P::CSC.Params, coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion,
-                        qw::QuadratureWeights, pc::PolarCoordinates, plotables::CSC.Plotables)
+function assemble_system(P::CSC.Params, F::CSC.Flags,
+                         coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion,
+                         qw::QuadratureWeights, pc::PolarCoordinates, plotables::CSC.Plotables,
+                         potentials::CSC.InteractionPotentials)
     compute_vr(P, coords, bufs, vr)
     compute_angles_radii(vr, pc)
     compute_line_coefficients(pc, qw)
@@ -237,6 +239,10 @@ function assemble_system(P::CSC.Params, coords::PointCoords, bufs::Visibility.Bu
 
     #  - k_MT ∫ ds/dt ∂_s Xθ^n
     b_ce_n[1:2] +=  - P.k_MT*reshape(integrate_θ(vr.M_inter*reshape(plotables.transport_force, P.N, 2), qw, vr), 2, 1)
+
+    if F.nucleus
+        b_ce_n[1:2] += potentials.CS_∇W
+    end
 
     # - k_MT ∫ |Xc - Xθ| eθ^T . ds/dt ∂_s Xθ^n
     b_ce_n[3] = -P.k_MT*integrate_θ_eθ(vr.M_inter*reshape(plotables.transport_force, P.N, 2), qw, vr)

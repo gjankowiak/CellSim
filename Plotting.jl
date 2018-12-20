@@ -10,6 +10,7 @@ animation = PyCall.pywrap(PyCall.pyimport("matplotlib.animation"))
 import CellSimCommon
 import Centrosome
 import Cortex
+import Nucleus
 import Wall
 import Utils
 
@@ -32,6 +33,10 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 
         line = ax[:plot](x[:,1], x[:,2], ".-", zorder=20)[1]
         polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
+
+        if F.nucleus
+            ax[:plot](zeros(P.Nnuc), zeros(P.Nnuc), color="green")
+        end
 
         ax[:scatter](x[:,1], x[:,2], color="black", zorder=30) # drag force
         ax[:plot](x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1] # initial condition
@@ -81,6 +86,10 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 
         line = ax[:plot](x[:,2], x[:,1], ".-", zorder=20)[1]
         polygon = ax[:fill](x[:,2], x[:,1], color="#f713e0", zorder=10)[1]
+
+        if F.nucleus
+            ax[:plot](zeros(P.Nnuc), zeros(P.Nnuc), color="green")
+        end
 
         ax[:scatter](x[:,2], x[:,1], color="black", zorder=30)
         # ax[:scatter](x[:,1], x[:,2], color="black", zorder=2)
@@ -144,7 +153,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
     return fig
 end
 
-function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::CellSimCommon.Plotables,
+function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.NucleusCoords,Missing}, k::Int, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::CellSimCommon.Plotables,
                      vr::Centrosome.VisibleRegion)
 
     x = coords.x
@@ -170,6 +179,11 @@ function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params
 
         patches[idx_p][:set_xy](x)
         idx_p += 1
+
+        if F.nucleus
+            lines[idx_l][:set_data](nucleus_coords.Y[:,1], nucleus_coords.Y[:,2])
+            idx_l += 1
+        end
 
         scatters[idx_s][:set_offsets](x)
         idx_s += 1
@@ -217,6 +231,11 @@ function update_plot(coords::Cortex.PointCoords, k::Int, P::CellSimCommon.Params
 
         patches[idx_p][:set_xy]([x[:,2] x[:,1]]) # cell polygon
         idx_p += 1
+
+        if F.nucleus
+            lines[idx_l][:set_data](nucleus_coords.Y[:,1], nucleus_coords.Y[:,2])
+            idx_l += 1
+        end
 
         if F.centrosome
             scatters[idx_s][:set_offsets]([coords.centro_x[2]; coords.centro_x[1]]) # centrosome

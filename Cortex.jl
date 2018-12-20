@@ -626,6 +626,7 @@ end
 function compute_residuals(x::Vector{Float64},
                            coords::PointCoords, coords_s::PointCoordsShifted,
                            inner_coords::PointCoords, inner_coords_s::PointCoordsShifted,
+                           potentials::CSC.InteractionPotentials,
                            P::Params, F::Flags, plotables::CSC.Plotables,
                            dst::Vector{Float64})
 
@@ -645,6 +646,10 @@ function compute_residuals(x::Vector{Float64},
     end
     if F.polymerize
         compute_transport_force(inner_coords, inner_coords_s, P, F, plotables, dst, true)
+    end
+
+    if F.nucleus
+        dst[:] = dst + potentials.C_∇W
     end
 
     if F.innerloop
@@ -686,11 +691,12 @@ function compute_residuals_J(x::Vector{Float64},
 end
 
 function wrap_residuals(coords::PointCoords, coords_s::PointCoordsShifted,
+                        potentials::CSC.InteractionPotentials,
                         P::Params, F::Flags, plotables::CSC.Plotables)
     inner_coords = deepcopy(coords)
     inner_coords_s = new_PointCoordsShifted(inner_coords)
     resi(x::Vector{Float64}, dst::Vector{Float64}) =
-        compute_residuals(x, coords, coords_s, inner_coords, inner_coords_s, P, F, plotables, dst)
+        compute_residuals(x, coords, coords_s, inner_coords, inner_coords_s, potentials, P, F, plotables, dst)
     resi_J(x::Vector{Float64}, dst_Df::SA.SparseMatrixCSC{Float64}) =
         compute_residuals_J(x, coords, coords_s, inner_coords, inner_coords_s, P, F, plotables, dst_Df)
 
