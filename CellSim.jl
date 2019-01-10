@@ -286,7 +286,7 @@ function main()
         end
 
         if F.centrosome
-            (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables, potentials)
+            (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, F, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables, potentials)
             # centrosome evolution
             M = ([[Jr_x+centro_id_comp centro_b_ce'];[centro_b_ce centro_A]])
 
@@ -305,7 +305,7 @@ function main()
 
         # plot
         # plot_period = F.write_animation ? 1 : 1
-        plot_period = F.write_animation ? 1 : 10
+        plot_period = F.write_animation ? 1 : 1
         if (F.plot & (k % plot_period == 0))
             Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
@@ -326,6 +326,9 @@ function main()
         # println("Divergence detected, aborting")
         # break
         # end
+
+        # DEBUG
+        read(stdin, 1)
     end
 
     if F.write_animation

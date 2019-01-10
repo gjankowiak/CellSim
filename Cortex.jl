@@ -649,7 +649,7 @@ function compute_residuals(x::Vector{Float64},
     end
 
     if F.nucleus
-        dst[:] = dst + potentials.C_∇W
+        dst[:] = dst + vec(potentials.C_∇W)
     end
 
     if F.innerloop

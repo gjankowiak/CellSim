@@ -156,13 +156,12 @@ function spdiagm_wrap(N::Int64, kv::Pair{Int64, Vector{Float64}}...)
     for (k, v) in kv
         @assert length(v) == N
         if k == 0
-            new_kv = (new_kv..., k => v)
+            new_kv = (new_kv..., 0 => v)
         else
             new_kv = (new_kv..., k => v[1:N-abs(k)])
-            new_kv = (new_kv..., -sign(k)*(N-k) => v[N-abs(k)+1:end])
+            new_kv = (new_kv..., -sign(k)*(N-abs(k)) => v[N-abs(k)+1:end])
         end
     end
-    println(new_kv)
     return SA.spdiagm(new_kv...)
 end
 
@@ -201,6 +200,7 @@ function update_K(c::NucleusCoords, new_c::NucleusCoords,
                      1 => Dp1,
                      2 => Dp2)
 
+    display(Matrix(M))
     new_c.k[:] = M\f
 end
 

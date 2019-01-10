@@ -241,7 +241,7 @@ function assemble_system(P::CSC.Params, F::CSC.Flags,
     b_ce_n[1:2] +=  - P.k_MT*reshape(integrate_θ(vr.M_inter*reshape(plotables.transport_force, P.N, 2), qw, vr), 2, 1)
 
     if F.nucleus
-        b_ce_n[1:2] += potentials.CS_∇W
+        b_ce_n[1:2] += vec(potentials.CS_∇W)
     end
 
     # - k_MT ∫ |Xc - Xθ| eθ^T . ds/dt ∂_s Xθ^n
