@@ -31,30 +31,45 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 
         ax[:set_aspect]("equal", "datalim")
 
+        # Cortex
         line = ax[:plot](x[:,1], x[:,2], ".-", zorder=20)[1]
+
+        # Cortex fillin
         polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
 
         if F.nucleus
-            ax[:plot](zeros(P.Nnuc), zeros(P.Nnuc), color="green")
+            # Nucleus
+            ax[:plot](zeros(P.Nnuc), zeros(P.Nnuc), color="yellow", zorder=16)
         end
 
-        ax[:scatter](x[:,1], x[:,2], color="black", zorder=30) # drag force
-        ax[:plot](x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1] # initial condition
+        # Drag force
+        # ax[:scatter](x[:,1], x[:,2], color="black", zorder=30)
 
-        ax[:quiver](coords.x[1], coords.x[2],
-                    zeros(size(x,1)), zeros(size(x,1)), zorder=100, units="xy", scale=30, width=0.001, color="blue") # transport force
+        # Initial condition
+        # ax[:plot](x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1]
+
+        # Transport force
+        # ax[:quiver](coords.x[1], coords.x[2],
+                    # zeros(size(x,1)), zeros(size(x,1)), zorder=100, units="xy", scale=30, width=0.001, color="blue")
 
         if F.centrosome
+            # Centrosome
+            ## Orientation
             ax[:quiver](coords.centro_x[1], coords.centro_x[2],
-                        [cos.(coords.centro_angle)], [sin.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01, color="#12b600") # centrosome
-            ax[:fill](x[:,1], x[:,2], color="#32d600", zorder=15)[1] # centrosome visibility
-            ax[:quiver](coords.centro_x[1], coords.centro_x[2],
-                        [0], [0], zorder=100, units="xy", scale=1e-2, width=0.01) # MT force
+                        [cos.(coords.centro_angle)], [sin.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01, color="#12b600")
+            ## Visibility
+            ax[:fill](x[:,1], x[:,2], color="#32d600", zorder=15)[1]
 
-            ax[:quiver]([0.0], [0.0], [0], [0], zorder=100, units="xy", scale=5, width=0.001) # MT force
-
+            ## Center
             mt_circle = PyPlot.matplotlib[:patches][:Circle]((coords.centro_x[1], coords.centro_x[2]), Centrosome.MT_RADIUS, zorder=110, alpha=0.5)
             ax[:add_artist](mt_circle)
+
+            # Microtubule force
+            # ax[:quiver](coords.centro_x[1], coords.centro_x[2],
+                        # [0], [0], zorder=100, units="xy", scale=1e-2, width=0.01) # MT force
+
+            # ax[:quiver]([0.0], [0.0], [0], [0], zorder=100, units="xy", scale=5, width=0.001) # MT force
+
         end
 
         if F.circular_wall
@@ -75,7 +90,8 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
             ax[:plot](levelset[:,1], levelset[:,2], -levelset[:,1], levelset[:,2], color="red", lw=0.5)
         end
 
-        ax[:scatter](x[:,1], x[:,2], color="red") # added mass
+        # Added mass
+        # ax[:scatter](x[:,1], x[:,2], color="red")
 
         ax[:axvline](0)
 
@@ -88,7 +104,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
         polygon = ax[:fill](x[:,2], x[:,1], color="#f713e0", zorder=10)[1]
 
         if F.nucleus
-            ax[:plot](zeros(P.Nnuc), zeros(P.Nnuc), color="green")
+            ax[:plot](zeros(P.Nnuc), zeros(P.Nnuc), color="yellow")
         end
 
         ax[:scatter](x[:,2], x[:,1], color="black", zorder=30)
@@ -174,58 +190,75 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
     idx_l = idx_s = idx_p = idx_a = 1
 
     if !F.landscape_plot
+
+        # Cortex
         lines[idx_l][:set_data](x[:,1], x[:,2])
         idx_l += 1
 
+        # Cortex fillin
         patches[idx_p][:set_xy](x)
         idx_p += 1
 
         if F.nucleus
+            # Nucleus
             lines[idx_l][:set_data](nucleus_coords.Y[:,1], nucleus_coords.Y[:,2])
             idx_l += 1
         end
 
-        scatters[idx_s][:set_offsets](x)
-        idx_s += 1
+        # Drag force
+        # scatters[idx_s][:set_offsets](x)
+        # idx_s += 1
 
-        scatters[idx_s][:set_offsets](x)
-        scatters[idx_s][:set_UVC](plotables.transport_force[:,1], plotables.transport_force[:,2])
-        idx_s += 1
+        # Initial condition
+        # idx_l += 1
+
+        # Transport force
+        # scatters[idx_s][:set_offsets](x)
+        # scatters[idx_s][:set_UVC](plotables.transport_force[:,1], plotables.transport_force[:,2])
+        # idx_s += 1
 
         if F.centrosome
+            # Centrosome
+            ## Orientation
             scatters[idx_s][:set_offsets](coords.centro_x) # centrosome
             scatters[idx_s][:set_UVC]([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
             idx_s += 1
 
-            patches[idx_p][:set_xy](vr.nodes[1:vr.n,:] .+ reshape(coords.centro_x, 1, 2)) # visibility region
+            ## Visibility
+            patches[idx_p][:set_xy](vr.nodes[1:vr.n,:] .+ reshape(coords.centro_x, 1, 2))
             idx_p += 1
 
-            scatters[idx_s][:set_offsets](coords.centro_x) # centrosome
-            scatters[idx_s][:set_UVC]([plotables.mt_force[1]], [plotables.mt_force[2]])
-            idx_s += 1
-
-            scatters[idx_s][:set_offsets](vr.nodes[1:vr.n,:].+reshape(coords.centro_x, 1, 2)) # MT force
-            scatters[idx_s][:set_UVC](1e-1plotables.mt_force_indiv[1:vr.n,1], 1e-1plotables.mt_force_indiv[1:vr.n,2])
-            idx_s += 1
-
+            ## Center
             artists[idx_a][:center] = (coords.centro_x[1], coords.centro_x[2])
             idx_a += 1
+
+            ## Microtubule force
+            # scatters[idx_s][:set_offsets](coords.centro_x) # centrosome
+            # scatters[idx_s][:set_UVC]([plotables.mt_force[1]], [plotables.mt_force[2]])
+            # idx_s += 1
+
+            # scatters[idx_s][:set_offsets](vr.nodes[1:vr.n,:].+reshape(coords.centro_x, 1, 2)) # MT force
+            # scatters[idx_s][:set_UVC](1e-1plotables.mt_force_indiv[1:vr.n,1], 1e-1plotables.mt_force_indiv[1:vr.n,2])
+            # idx_s += 1
         end
 
-        scatters[idx_s][:set_offsets](x)
-        scatters[idx_s][:set_sizes](0e4*plotables.mass_source)
-        colors = Array{String}(undef, size(x, 1))
-        fill!(colors, "red")
-        x_max, x_max_idx = findmax(x[:,2])
-        colors[x_max_idx] = "yellow"
-        scatters[idx_s][:set_color](colors)
-        idx_s += 1
+        # Added mass
+        # scatters[idx_s][:set_offsets](x)
+        # scatters[idx_s][:set_sizes](0e4*plotables.mass_source)
+        # colors = Array{String}(undef, size(x, 1))
+        # fill!(colors, "red")
+        # x_max, x_max_idx = findmax(x[:,2])
+        # colors[x_max_idx] = "yellow"
+        # scatters[idx_s][:set_color](colors)
+        # idx_s += 1
 
         lims = ax[:get_ylim]()
 
         x_min, x_max = minimum(x[:,2]), maximum(x[:,2])
         x_mid = 0.5(x_max+x_min)
     else
+        # Portrait mode
+        @assert(false)
         lines[idx_l][:set_data](x[:,2], x[:,1])
         idx_l += 1
 
@@ -280,13 +313,13 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
         end
     end
 
-    if F.plot_drag
-        scatters[1][:set_sizes](10CellSimCommon.@entry_norm(plotables.drag_force))
-    else
-        scatters[1][:set_sizes](0CellSimCommon.@entry_norm(plotables.drag_force))
-    end
-    scatters[1][:set_facecolor](Utils.scale_cm(plotables.mass_source, PyPlot.get_cmap("RdYlGn");
-                                               range_min=-P.c, range_max=P.c))
+    # if F.plot_drag
+        # scatters[1][:set_sizes](10CellSimCommon.@entry_norm(plotables.drag_force))
+    # else
+        # scatters[1][:set_sizes](0CellSimCommon.@entry_norm(plotables.drag_force))
+    # end
+    # scatters[1][:set_facecolor](Utils.scale_cm(plotables.mass_source, PyPlot.get_cmap("RdYlGn");
+                                               # range_min=-P.c, range_max=P.c))
 
 
     PyPlot.draw()

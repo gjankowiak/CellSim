@@ -52,16 +52,19 @@ end
 # - FIX the handl
 
 function g(x::Vector{Float64}, α::Float64)
+    return zeros(size(x))
     return -min.(α*x.-1, 0.0).^2 .* log.(α*x)
 end
 
 function g_p(x::Vector{Float64}, α::Float64)
+    return zeros(size(x))
     return -(2α*min.(α*x.-1, 0.0).*log.(α*x) .+ min.(α*x.-1, 0.0).^2 ./x)
 end
 
-function g_pp(x::Vector{Float64}, α::Float64)
-    return -(2α^2*(x.<(1/α)).*log.(α*x) .+ 4α*min.(α*x.-1, 0.0)./x .- min.(α*x.-1, 0.0).^2 ./x.^2)
-end
+# unused
+# function g_pp(x::Vector{Float64}, α::Float64)
+    # return -(2α^2*(x.<(1/α)).*log.(α*x) .+ 4α*min.(α*x.-1, 0.0)./x .- min.(α*x.-1, 0.0).^2 ./x.^2)
+# end
 
 function compute_contact_force(pots::CSC.InteractionPotentials,
                                cor_coords::PointCoords, c::NucleusCoords,
@@ -200,7 +203,6 @@ function update_K(c::NucleusCoords, new_c::NucleusCoords,
                      1 => Dp1,
                      2 => Dp2)
 
-    display(Matrix(M))
     new_c.k[:] = M\f
 end
 

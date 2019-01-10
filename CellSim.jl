@@ -210,12 +210,6 @@ function main()
         coords.centro_x[:] = sum(x_init; dims=1)/size(x_init,1)
     end
 
-    fig = Plotting.init_plot(coords, P, F)
-    if F.write_animation
-        writer = Plotting.init_animation(date_string)
-        writer[:setup](fig, string(writer[:metadata]["title"], ".mp4"), 100)
-    end
-
     nucleus_coords = missing
 
     if F.nucleus
@@ -252,6 +246,13 @@ function main()
         else
             δx = zeros(2P.N+3)
         end
+    end
+
+    fig = Plotting.init_plot(coords, P, F)
+    Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
+    if F.write_animation
+        writer = Plotting.init_animation(date_string)
+        writer[:setup](fig, string(writer[:metadata]["title"], ".mp4"), 100)
     end
 
     k = 0
