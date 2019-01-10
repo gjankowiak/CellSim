@@ -1,6 +1,7 @@
 module CellSim
 
 import CellSimCommon
+const CSC = CellSimCommon
 import Cortex
 import Nucleus
 import Wall
@@ -28,7 +29,7 @@ macro eval_if_string(s)
     return esc(:(isa($s, String) ? eval(Meta.parse($s)) : $s))
 end
 
-function compute_initial_x(P::CellSimCommon.Params, F::CellSimCommon.Flags; convex::Bool=true)
+function compute_initial_x(P::CSC.Params, F::CSC.Flags; convex::Bool=true)
     t = collect(range(0; stop=1, length=P.N+1))[1:P.N]
 
     if convex
@@ -81,7 +82,7 @@ function main()
     y_params = yaml_config["params"]
 
     # Parameters
-    P = CellSimCommon.Params(
+    P = CSC.Params(
         y_params["M"],
         1/y_params["N"], # Δσ
         y_params["δt"],
@@ -123,7 +124,7 @@ function main()
     y_flags = yaml_config["flags"]
 
     # Flags
-    F = CellSimCommon.Flags(
+    F = CSC.Flags(
           # model options
           y_flags["confine"],
           y_flags["adjust_drag"],
@@ -162,7 +163,7 @@ function main()
     end
     println(" ")
 
-    plotables = CellSimCommon.new_plotables(P.N)
+    plotables = CSC.new_plotables(P.N)
 
     if haskey(yaml_config, "load_state")
         load_state = yaml_config["load_state"]
@@ -220,9 +221,17 @@ function main()
     if F.nucleus
         old_nucleus_coords = Nucleus.initialize_coords(P, F, coords)
         nucleus_coords = Nucleus.initialize_coords(P, F, coords)
+        temparrays = CSC.TempArrays6(
+                                     zeros(P.Nnuc),
+                                     zeros(P.Nnuc),
+                                     zeros(P.Nnuc),
+                                     zeros(P.Nnuc),
+                                     zeros(P.Nnuc),
+                                     zeros(P.Nnuc)
+                                    )
     end
 
-    potentials = CellSimCommon.InteractionPotentials(
+    potentials = CSC.InteractionPotentials(
         zeros(P.Nnuc),
         zeros(P.Nnuc, 2),
         zeros(P.N, 2),
@@ -251,8 +260,8 @@ function main()
     # outer loop
     while k < P.M
         k += 1
-        print("\b"^100)
-        print(" iteration #", k, ", ")
+        # print("\b"^100)
+        println(" iteration #", k, ", ")
 
         # inner loop
         if k > 1
@@ -266,7 +275,7 @@ function main()
             fill!(potentials.CS_∇W, 0.0)
             Nucleus.compute_contact_force(potentials, coords, nucleus_coords, P, F)
             Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
-            Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F)
+            Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays)
         end
 
         if F.cortex

@@ -76,7 +76,7 @@ function compute_contact_force(pots::CSC.InteractionPotentials,
 
         pots.C_∇W[:] = pots.C_∇W - ∇pot
         pots.N_W[i] = pots.N_W[i] + sum(pot)
-        pots.N_∇W[i,:] = pots.N_∇W[i,:] + sum(∇pot; dims=1)
+        pots.N_∇W[i,:] = pots.N_∇W[i,:] + vec(sum(∇pot; dims=1))
     end
 end
 
@@ -84,25 +84,27 @@ function compute_centronuclear_force(pots::CSC.InteractionPotentials,
                                      cor_coords::PointCoords, c::NucleusCoords,
                                      P::Params, F::Flags)
 
-    Yc = c.Y .- cor_coords.centro_x
-    d = sqrt.(sum(abs2, Yc))
+    Yc = c.Y .- cor_coords.centro_x'
+    d = sqrt.(sum(abs2, Yc; dims=2))
     Yc_norm = Yc ./ d
 
-    pots.CS_∇W[:] = pots.CS_∇W + vec(sum(P.N_kc * (d-P.N_l0c) * Yc_norm; dims=1))
+    pots.CS_∇W[:] = pots.CS_∇W + sum(P.N_kc * (d .- P.N_l0c) .* Yc_norm; dims=1)
 
-    pots.N_W[:] = pots.N_W + 0.5*P.N_kc/P.Nnuc*(d-P.N_l0c).^2
-    pots.N_∇W[:] = pots.N_∇W - repeat(pots.CS_∇W', P.Nnuc)/P.Nnuc
+    pots.N_W[:] = pots.N_W + 0.5*P.N_kc/P.Nnuc*(d .- P.N_l0c).^2
+    pots.N_∇W[:] = pots.N_∇W - repeat(pots.CS_∇W, P.Nnuc)/P.Nnuc
 end
 
 function update_alphabeta(c::NucleusCoords, new_c::NucleusCoords,
                           W::Vector{Float64}, ∇W::Matrix{Float64},
                           P::Params, F::Flags)
+    circ_idx = new_c.circ_idx
+
     c.β[:] = (
               P.N_kb./c.r .*((c.k[circ_idx.p1]-c.k)./c.q - (c.k - c.k[circ_idx.m1])./c.q[circ_idx.m1])
               + 0.5P.N_kb*c.k.^3
-              - P.N_P
+              .- P.N_P
               + 0.5*(W+W[circ_idx.m1]).*c.k
-              - 0.5vec(sum(c.n.*(∇W+∇W[circ_idx.m1]; dims=2)))
+              - 0.5vec(sum(c.n.*(∇W+∇W[circ_idx.m1,:]); dims=2))
              )
 
     B = sum(c.r .* c.k .* c.β) / c.L
@@ -110,7 +112,7 @@ function update_alphabeta(c::NucleusCoords, new_c::NucleusCoords,
     for i in 2:P.Nnuc
         new_c.α[i] = (new_c.α[i-1]
                            + c.r[i]*(-c.k[i]*c.β[i]
-                                              +c.B)
+                                     +B)
                            + (c.L/P.Nnuc - c.r[i])*P.N_ω)
     end
 end
@@ -130,6 +132,7 @@ function finite_differences_3(new_c::NucleusCoords,
                               Dp1::Vector{Float64}, Dp2::Vector{Float64};
                               prefactor::Float64=1.0)
     c = new_c
+    circ_idx = c.circ_idx
     Dm2[:] = @. prefactor/ (c.q[circ_idx.m1] * c.q[circ_idx.m2] * c.r[circ_idx.m1])
     Dp2[:] = @. prefactor/ (c.q * c.q[circ_idx.p1] * c.r[circ_idx.p1])
 
@@ -185,17 +188,18 @@ function update_K(c::NucleusCoords, new_c::NucleusCoords,
             new_c.r.*c.k/P.δt
             - 0.5P.N_kb*(c.k[circ_idx.p1].^3 - c.k.^3)./c.q
             + 0.5P.N_kb*(c.k.^3 - c.k[circ_idx.m1].^3)./c.q[circ_idx.p1]
-            + 0.5*vec( CSC.@dotprod(∇W[circ_idx.p1] + ∇W, c.n[circ_idx.p1]) ./ c.q
-                   +CSC.@dotprod(∇W + ∇W[circ_idx.m1], c.n) .* (1 ./c.q + 1 ./c.q[circ_idx.m1])
-                   +CSC.@dotprod(∇W[circ_idx.m1]+∇W[circ_idx.m2], c.n[circ_idx.m1]) ./ c.q[circ_idx.m1]
+            + 0.5*vec( CSC.@dotprod(∇W[circ_idx.p1,:] + ∇W, c.n[circ_idx.p1,:]) ./ c.q
+                   +CSC.@dotprod(∇W + ∇W[circ_idx.m1,:], c.n) .* (1 ./c.q + 1 ./c.q[circ_idx.m1])
+                   +CSC.@dotprod(∇W[circ_idx.m1,:]+∇W[circ_idx.m2,:], c.n[circ_idx.m1,:]) ./ c.q[circ_idx.m1]
                   )
            )
 
-    M = spdiagm_wrap(-2 => Dm2,
-                   -1 => Dm1,
-                   0 => D0,
-                   1 => Dp1,
-                   2 => Dp2)
+    M = spdiagm_wrap(P.Nnuc,
+                     -2 => Dm2,
+                     -1 => Dm1,
+                     0 => D0,
+                     1 => Dp1,
+                     2 => Dp2)
 
     new_c.k[:] = M\f
 end
@@ -220,14 +224,15 @@ function update_θ(c::NucleusCoords, new_c::NucleusCoords,
 
     f[:] = (new_c.r.*c.θ/P.δt
             - 0.5P.N_kb*(((c.θ[circ_idx.p1] - c.θ)./c.q).^3 + ((c.θ - c.θ[circ_idx.m1])./c.q[circ_idx.m1]).^3)
-            + 0.5*vec(CSC.@dotprod(∇W, (c.n[circ_idx.p1] + c.n)) + CSC.@dotprod(∇W[circ_idx.m1], (c.n + c.n[circ_idx.m1])))
+            + 0.5*vec(CSC.@dotprod(∇W, (c.n[circ_idx.p1,:] + c.n)) + CSC.@dotprod(∇W[circ_idx.m1,:], (c.n + c.n[circ_idx.m1,:])))
            )
 
-    M = spdiagm_wrap(-2 => Dm2,
-                   -1 => Dm1,
-                   0 => D0,
-                   1 => Dp1,
-                   2 => Dp2)
+    M = spdiagm_wrap(P.Nnuc,
+                     -2 => Dm2,
+                     -1 => Dm1,
+                     0 => D0,
+                     1 => Dp1,
+                     2 => Dp2)
 
     new_c.θ[:] = M\f
 
@@ -254,17 +259,19 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
     f = (
          vec(new_c.q .* c.Y)/P.δt
          -0.5P.N_P*vec(new_c.r[circ_idx.p1].*n_p1 + new_c.r.*n)
-         -0.5*(
-                c.r[circ_idx.p1] .* vec(CSC.@dotprod(c.n[circ_idx.p1], ∇W)) .* c.n[circ_idx.p1]
+         -0.5*vec(
+                c.r[circ_idx.p1] .* vec(CSC.@dotprod(c.n[circ_idx.p1,:], ∇W)) .* c.n[circ_idx.p1,:]
                +c.r .* vec(CSC.@dotprod(c.n, ∇W)) .* c.n
               )
         )
 
-    _M = spdiagm_wrap(-2 => Dm2,
-                   -1 => Dm1,
-                   0 => D0,
-                   1 => Dp1,
-                   2 => Dp2)
+
+    _M = spdiagm_wrap(P.Nnuc,
+                      -2 => Dm2,
+                      -1 => Dm1,
+                      0 => D0,
+                      1 => Dp1,
+                      2 => Dp2)
 
     M = CSC.@repdiagblk(_M, 2)
 
@@ -300,16 +307,16 @@ end
 
 function update_coords(c::NucleusCoords, new_c::NucleusCoords,
                        potentials::CSC.InteractionPotentials,
-                       P::Params, F::Flags)
+                       P::Params, F::Flags, temparrays::CSC.TempArrays6)
 
     N_W = potentials.N_W
     N_∇W = potentials.N_∇W
 
-    update_alphabeta(c, new_c, N_W, N_∇W, P, F, temparrays)
-    update_r(c, new_c, W, ∇W, P, F, temparrays)
-    update_K(c, new_c, W, ∇W, P, F, temparrays)
-    update_θ(c, new_c, W, ∇W, P, F, temparrays)
-    update_Y(c, new_c, W, ∇W, P, F, temparrays)
+    update_alphabeta(c, new_c, N_W, N_∇W, P, F)
+    update_r(c, new_c, N_W, N_∇W, P, F)
+    update_K(c, new_c, N_W, N_∇W, P, F, temparrays)
+    update_θ(c, new_c, N_W, N_∇W, P, F, temparrays)
+    update_Y(c, new_c, N_W, N_∇W, P, F, temparrays)
 end
 
 end # module Nucleus

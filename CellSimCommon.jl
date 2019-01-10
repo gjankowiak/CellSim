@@ -215,7 +215,7 @@ macro repdiag(M, n)
 end
 
 macro repdiagblk(M, n)
-    return :( SA.blockdiag(ntuple((_) -> $M, $n)...) )
+    return esc(:( SA.blockdiag(ntuple((_) -> $M, $n)...) ))
 end
 
 @inbounds function shift!(src::Array{Float64}, dst::Array{Float64})
