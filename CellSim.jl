@@ -11,6 +11,9 @@ import Plotting
 
 import Centrosome
 
+import LinearAlgebra
+const LA = LinearAlgebra
+
 import Utils
 import SurfacesCommon
 import EvenParam
@@ -234,6 +237,7 @@ function main()
 
     # centrosome buffers and coordinates
     (centro_bufs, centro_vr, centro_qw, centro_pc) = Centrosome.init(P)
+    (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, F, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables, potentials)
 
     resi, resi_J = Cortex.wrap_residuals(coords, coords_s, potentials, P, F, plotables)
     if F.innerloop
@@ -258,10 +262,18 @@ function main()
     k = 0
     prev_height = 0.0
 
+    println("Initialized")
+
     # outer loop
     while k < P.M
+        #
+        # DEBUG
+        display(nucleus_coords.k)
+        println()
+        key = read(stdin, 1)
+
         k += 1
-        # print("\b"^100)
+        print("\b"^100)
         println(" iteration #", k, ", ")
 
         # inner loop
@@ -277,6 +289,8 @@ function main()
             Nucleus.compute_contact_force(potentials, coords, nucleus_coords, P, F)
             Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
             Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays)
+
+            Nucleus.copy(old_nucleus_coords, nucleus_coords)
         end
 
         if F.cortex
@@ -328,8 +342,7 @@ function main()
         # break
         # end
 
-        # DEBUG
-        read(stdin, 1)
+
     end
 
     if F.write_animation
@@ -337,7 +350,8 @@ function main()
     end
     println("Finished, type Enter to exit")
     read(stdin, 1)
-    # output
+
+    return
 end
 
 end # module

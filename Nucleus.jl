@@ -13,7 +13,7 @@ const SA = SparseArrays
 import LinearAlgebra
 const LA = LinearAlgebra
 
-struct NucleusCoords
+mutable struct NucleusCoords
     # node coordinates
     Y::Matrix{Float64}
 
@@ -45,6 +45,19 @@ struct NucleusCoords
     L::Float64
 
     circ_idx::CSC.CircIdx
+end
+
+function copy(dst::NucleusCoords, src::NucleusCoords)
+    dst.Y[:] = src.Y
+    dst.α[:] = src.α
+    dst.β[:] = src.β
+    dst.k[:] = src.k
+    dst.r[:] = src.r
+    dst.q[:] = src.q
+    dst.θ[:] = src.θ
+    dst.n[:] = src.n
+    dst.η[:] = src.η
+    dst.L = src.L
 end
 
 # TODO
@@ -110,6 +123,10 @@ function update_alphabeta(c::NucleusCoords, new_c::NucleusCoords,
               - 0.5vec(sum(c.n.*(∇W+∇W[circ_idx.m1,:]); dims=2))
              )
 
+    println("beta")
+    display(c.β)
+    println()
+
     B = sum(c.r .* c.k .* c.β) / c.L
     new_c.α[1] = 0
     for i in 2:P.Nnuc
@@ -123,9 +140,7 @@ end
 function update_r(c::NucleusCoords, new_c::NucleusCoords,
                   W::Vector{Float64}, ∇W::Matrix{Float64},
                   P::Params, F::Flags)
-    new_c.η[:] = c.η + P.δt*(c.k .* c.β
-                                               +(new_c.α - new_c.α[new_c.circ_idx.m1])
-                                               ./c.r)
+    new_c.η[:] = c.η + P.δt*(c.k .* c.β +(new_c.α - new_c.α[new_c.circ_idx.m1])./c.r)
     new_c.r[:] = exp.(new_c.η)
 end
 
@@ -133,24 +148,42 @@ function finite_differences_3(new_c::NucleusCoords,
                               Dm2::Vector{Float64}, Dm1::Vector{Float64},
                               D0::Vector{Float64},
                               Dp1::Vector{Float64}, Dp2::Vector{Float64};
-                              prefactor::Float64=1.0)
+                              prefactor::Float64=1.0, dual::Bool=false)
     c = new_c
     circ_idx = c.circ_idx
-    Dm2[:] = @. prefactor/ (c.q[circ_idx.m1] * c.q[circ_idx.m2] * c.r[circ_idx.m1])
-    Dp2[:] = @. prefactor/ (c.q * c.q[circ_idx.p1] * c.r[circ_idx.p1])
+    if dual
+        Dm2[:] = @. prefactor/ (c.q[circ_idx.m1] * c.q[circ_idx.m2] * c.r[circ_idx.m1])
+        Dp2[:] = @. prefactor/ (c.q * c.q[circ_idx.p1] * c.r[circ_idx.p1])
 
-    Dm1[:] = @. -prefactor * (
-             1 / (c.r * c.q * c.q[circ_idx.m1])
-            +1 / (c.r * c.q[circ_idx.m1]^2)
-            +1 / (c.r[circ_idx.m1] * c.q[circ_idx.m1]^2)
-            +1 / (c.r[circ_idx.m1] * c.q[circ_idx.m1] * c.q[circ_idx.m2])
-           )
-    Dm1[:] = @. -prefactor * (
-             1 / (c.r[circ_idx.p1] * c.q[circ_idx.p1] * c.q)
-            +1 / (c.r[circ_idx.p1] * c.q^2)
-            +1 / (c.r * c.q^2)
-            +1 / (c.r * c.q * c.q[circ_idx.m1])
-           )
+        Dm1[:] = @. -prefactor * (
+                 1 / (c.r * c.q * c.q[circ_idx.m1])
+                +1 / (c.r * c.q[circ_idx.m1]^2)
+                +1 / (c.r[circ_idx.m1] * c.q[circ_idx.m1]^2)
+                +1 / (c.r[circ_idx.m1] * c.q[circ_idx.m1] * c.q[circ_idx.m2])
+               )
+        Dp1[:] = @. -prefactor * (
+                 1 / (c.r[circ_idx.p1] * c.q[circ_idx.p1] * c.q)
+                +1 / (c.r[circ_idx.p1] * c.q^2)
+                +1 / (c.r * c.q^2)
+                +1 / (c.r * c.q * c.q[circ_idx.m1])
+               )
+    else
+        Dm2[:] = @. prefactor/ (c.r * c.r[circ_idx.m1] * c.q[circ_idx.m1])
+        Dp2[:] = @. prefactor/ (c.r[circ_idx.p1] * c.r[circ_idx.p2] * c.q[circ_idx.p1])
+
+        Dm1[:] = @. -prefactor * (
+                 1 / (c.q[circ_idx.m1] * c.r[circ_idx.m1] * c.r)
+                +1 / (c.q[circ_idx.m1] * c.r^2)
+                +1 / (c.q * c.r^2)
+                +1 / (c.q * c.r[circ_idx.m1] * c.r)
+               )
+        Dp1[:] = @. -prefactor * (
+                 1 / (c.q * c.r * c.r[circ_idx.p1])
+                +1 / (c.q * c.r[circ_idx.p1]^2)
+                +1 / (c.q[circ_idx.p1] * c.r[circ_idx.p1]^2)
+                +1 / (c.q[circ_idx.p1] * c.r[circ_idx.p1] * c.r[circ_idx.p2])
+               )
+    end
     D0[:] = -(Dm2 + Dm1 + Dp1 + Dp2)
 end
 
@@ -175,7 +208,7 @@ function update_K(c::NucleusCoords, new_c::NucleusCoords,
 
     (Dm2, Dm1, D0, Dp1, Dp2, f) = CSC.@ta6_tuple(temparrays)
 
-    finite_differences_3(new_c, Dm2, Dm2, D0, Dp1, Dp2; prefactor=P.N_kb)
+    finite_differences_3(new_c, Dm2, Dm1, D0, Dp1, Dp2; prefactor=P.N_kb)
 
     Dm1[:] = Dm1 + @. 0.5 * (new_c.α[circ_idx.m1] - (W[circ_idx.m1] + W[circ_idx.m2])./new_c.q[circ_idx.m1])
     Dp1[:] = Dp1 + @. 0.5 * (-new_c.α - (W[circ_idx.p1] + W)./new_c.q)
@@ -189,9 +222,9 @@ function update_K(c::NucleusCoords, new_c::NucleusCoords,
     f[:] = (
             new_c.r.*c.k/P.δt
             - 0.5P.N_kb*(c.k[circ_idx.p1].^3 - c.k.^3)./c.q
-            + 0.5P.N_kb*(c.k.^3 - c.k[circ_idx.m1].^3)./c.q[circ_idx.p1]
+            + 0.5P.N_kb*(c.k.^3 - c.k[circ_idx.m1].^3)./c.q[circ_idx.m1]
             + 0.5*vec( CSC.@dotprod(∇W[circ_idx.p1,:] + ∇W, c.n[circ_idx.p1,:]) ./ c.q
-                   +CSC.@dotprod(∇W + ∇W[circ_idx.m1,:], c.n) .* (1 ./c.q + 1 ./c.q[circ_idx.m1])
+                   -CSC.@dotprod(∇W + ∇W[circ_idx.m1,:], c.n) .* (1 ./c.q + 1 ./c.q[circ_idx.m1])
                    +CSC.@dotprod(∇W[circ_idx.m1,:]+∇W[circ_idx.m2,:], c.n[circ_idx.m1,:]) ./ c.q[circ_idx.m1]
                   )
            )
@@ -213,7 +246,7 @@ function update_θ(c::NucleusCoords, new_c::NucleusCoords,
 
     (Dm2, Dm1, D0, Dp1, Dp2, f) = CSC.@ta6_tuple(temparrays)
 
-    finite_differences_3(new_c, Dm2, Dm2, D0, Dp1, Dp2; prefactor=P.N_kb)
+    finite_differences_3(new_c, Dm2, Dm1, D0, Dp1, Dp2; prefactor=P.N_kb)
 
     Dm1[:] = Dm1 + 0.5new_c.α[circ_idx.m1] - W[circ_idx.m1]./new_c.q[circ_idx.m1]
     Dp1[:] = Dp1 - 0.5new_c.α - W./new_c.q
@@ -221,11 +254,11 @@ function update_θ(c::NucleusCoords, new_c::NucleusCoords,
     D0[:] = D0 + (
                   new_c.r/P.δt
                   + 0.5*(new_c.α + new_c.α[circ_idx.m1])
-                  - (W./new_c.q + W[circ_idx.m1]./new_c.q[circ_idx.m1])
+                  + (W./new_c.q + W[circ_idx.m1]./new_c.q[circ_idx.m1])
                  )
 
     f[:] = (new_c.r.*c.θ/P.δt
-            - 0.5P.N_kb*(((c.θ[circ_idx.p1] - c.θ)./c.q).^3 + ((c.θ - c.θ[circ_idx.m1])./c.q[circ_idx.m1]).^3)
+            + 0.5P.N_kb*(-((c.θ[circ_idx.p1] - c.θ)./c.q).^3 + ((c.θ - c.θ[circ_idx.m1])./c.q[circ_idx.m1]).^3)
             + 0.5*vec(CSC.@dotprod(∇W, (c.n[circ_idx.p1,:] + c.n)) + CSC.@dotprod(∇W[circ_idx.m1,:], (c.n + c.n[circ_idx.m1,:])))
            )
 
@@ -248,7 +281,7 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
 
     (Dm2, Dm1, D0, Dp1, Dp2, _) = CSC.@ta6_tuple(temparrays)
 
-    finite_differences_3(new_c, Dm2, Dm2, D0, Dp1, Dp2; prefactor=P.N_kb)
+    finite_differences_3(new_c, Dm2, Dm1, D0, Dp1, Dp2; prefactor=P.N_kb, dual=true)
 
     Dm1[:] = Dm1 + 1.5P.N_kb*new_c.k.^2 ./new_c.r + 0.5new_c.α - W./new_c.r
     Dp1[:] = Dp1 + 1.5P.N_kb*new_c.k[circ_idx.p1].^2 ./new_c.r[circ_idx.p1] - 0.5new_c.α - W./new_c.r[circ_idx.p1]
@@ -287,6 +320,9 @@ function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords)
     bc = sum(cortex_c.x; dims=1) / P.N
     t = collect(range(0, stop=2pi, length=P.Nnuc+1))[1:P.Nnuc]
 
+    θ0 = π/P.Nnuc
+    θ = collect(π/2 + θ0 .+ (-1:(P.Nnuc-2))*2*θ0)
+
     nc = NucleusCoords(
         P.N_r_init*[cos.(t) sin.(t)] .+ bc, # Y
         zeros(P.Nnuc), # α
@@ -294,15 +330,14 @@ function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords)
         1/P.N_r_init * ones(P.Nnuc), # k
         sin(π/P.Nnuc)*P.N_r_init * ones(P.Nnuc), # r
         sin(π/P.Nnuc)*P.N_r_init * ones(P.Nnuc), # q
-        collect(2π/P.Nnuc * (-1:(P.Nnuc-2))), # θ
-        zeros(P.Nnuc, 2), # n
-        zeros(P.Nnuc), # η
+        θ, # θ
+        [sin.(θ) -cos.(θ)], # n
+        log.(sin(π/P.Nnuc)*P.N_r_init * ones(P.Nnuc)), # η
         2π*P.N_r_init, # L
         CSC.init_circ_idx(P.Nnuc) # circ_idx
        )
 
     nc.Y[:] = nc.Y .+ bc
-    nc.n[:] = [sin.(nc.θ) cos.(nc.θ)]
 
     return nc
 end

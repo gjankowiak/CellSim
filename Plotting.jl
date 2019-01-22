@@ -32,14 +32,21 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
         ax[:set_aspect]("equal", "datalim")
 
         # Cortex
-        line = ax[:plot](x[:,1], x[:,2], ".-", zorder=20)[1]
+        ax[:plot](x[:,1], x[:,2], ".-", zorder=20)[1]
 
         # Cortex fillin
-        polygon = ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
+        ax[:fill](x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
 
         if F.nucleus
             # Nucleus
             ax[:plot](zeros(P.Nnuc), zeros(P.Nnuc), color="yellow", zorder=16)
+
+            # Nucleus fillin
+            ax[:fill](zeros(P.Nnuc), zeros(P.Nnuc), color="yellow", zorder=16)[1]
+
+            # Normals
+            ax[:quiver](zeros(P.Nnuc), zeros(P.Nnuc),
+                        zeros(P.Nnuc), zeros(P.Nnuc), zorder=100, units="xy", scale=1e-2, width=0.01)
         end
 
         # Drag force
@@ -55,14 +62,15 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
         if F.centrosome
             # Centrosome
             ## Orientation
-            ax[:quiver](coords.centro_x[1], coords.centro_x[2],
-                        [cos.(coords.centro_angle)], [sin.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01, color="#12b600")
+            # ax[:quiver](coords.centro_x[1], coords.centro_x[2],
+                        # [cos.(coords.centro_angle)], [sin.(coords.centro_angle)], zorder=100, units="xy", scale=10, width=0.01, color="#12b600")
+
             ## Visibility
-            ax[:fill](x[:,1], x[:,2], color="#32d600", zorder=15)[1]
+            ax[:fill](x[:,1], x[:,2], color="#32d600", zorder=15, alpha=1.0)[1]
 
             ## Center
-            mt_circle = PyPlot.matplotlib[:patches][:Circle]((coords.centro_x[1], coords.centro_x[2]), Centrosome.MT_RADIUS, zorder=110, alpha=0.5)
-            ax[:add_artist](mt_circle)
+            # PyPlot.matplotlib[:patches][:Circle]((coords.centro_x[1], coords.centro_x[2]), Centrosome.MT_RADIUS, zorder=110, alpha=0.5)
+            # ax[:add_artist](mt_circle)
 
             # Microtubule force
             # ax[:quiver](coords.centro_x[1], coords.centro_x[2],
@@ -164,8 +172,8 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
     PyPlot.draw()
 
     sleep(0.001)
-    println("Finishing plot init...")
-    sleep(3)
+    # println("Finishing plot init...")
+    # sleep(1)
     return fig
 end
 
@@ -201,8 +209,18 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
 
         if F.nucleus
             # Nucleus
-            lines[idx_l][:set_data](nucleus_coords.Y[:,1], nucleus_coords.Y[:,2])
+            lines[idx_l][:set_data]([nucleus_coords.Y[:,1]; nucleus_coords.Y[1,1]],
+                                    [nucleus_coords.Y[:,2]; nucleus_coords.Y[1,2]])
             idx_l += 1
+
+            patches[idx_p][:set_xy](nucleus_coords.Y)
+            idx_p += 1
+
+            # normal-s
+            midpoints = 0.5*(nucleus_coords.Y+circshift(nucleus_coords.Y, 1))
+            scatters[idx_s][:set_offsets](midpoints)
+            scatters[idx_s][:set_UVC](nucleus_coords.n[:,1], nucleus_coords.n[:,2])
+            idx_s += 1
         end
 
         # Drag force
@@ -220,17 +238,17 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
         if F.centrosome
             # Centrosome
             ## Orientation
-            scatters[idx_s][:set_offsets](coords.centro_x) # centrosome
-            scatters[idx_s][:set_UVC]([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
-            idx_s += 1
+            # scatters[idx_s][:set_offsets](coords.centro_x) # centrosome
+            # scatters[idx_s][:set_UVC]([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
+            # idx_s += 1
 
             ## Visibility
             patches[idx_p][:set_xy](vr.nodes[1:vr.n,:] .+ reshape(coords.centro_x, 1, 2))
             idx_p += 1
 
             ## Center
-            artists[idx_a][:center] = (coords.centro_x[1], coords.centro_x[2])
-            idx_a += 1
+            # artists[idx_a][:center] = (coords.centro_x[1], coords.centro_x[2])
+            # idx_a += 1
 
             ## Microtubule force
             # scatters[idx_s][:set_offsets](coords.centro_x) # centrosome
