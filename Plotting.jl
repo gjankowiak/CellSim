@@ -46,7 +46,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 
             # Normals
             ax[:quiver](zeros(P.Nnuc), zeros(P.Nnuc),
-                        zeros(P.Nnuc), zeros(P.Nnuc), zorder=100, units="xy", scale=1e-2, width=0.01)
+                        zeros(P.Nnuc), zeros(P.Nnuc), zorder=100, units="xy", scale=1e1, width=0.01)
         end
 
         # Drag force

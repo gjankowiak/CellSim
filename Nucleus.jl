@@ -74,11 +74,6 @@ function g_p(x::Vector{Float64}, α::Float64)
     return -(2α*min.(α*x.-1, 0.0).*log.(α*x) .+ min.(α*x.-1, 0.0).^2 ./x)
 end
 
-# unused
-# function g_pp(x::Vector{Float64}, α::Float64)
-    # return -(2α^2*(x.<(1/α)).*log.(α*x) .+ 4α*min.(α*x.-1, 0.0)./x .- min.(α*x.-1, 0.0).^2 ./x.^2)
-# end
-
 function compute_contact_force(pots::CSC.InteractionPotentials,
                                cor_coords::PointCoords, c::NucleusCoords,
                                P::Params, F::Flags)
@@ -122,10 +117,6 @@ function update_alphabeta(c::NucleusCoords, new_c::NucleusCoords,
               + 0.5*(W+W[circ_idx.m1]).*c.k
               - 0.5vec(sum(c.n.*(∇W+∇W[circ_idx.m1,:]); dims=2))
              )
-
-    println("beta")
-    display(c.β)
-    println()
 
     B = sum(c.r .* c.k .* c.β) / c.L
     new_c.α[1] = 0
@@ -175,7 +166,7 @@ function finite_differences_3(new_c::NucleusCoords,
                  1 / (c.q[circ_idx.m1] * c.r[circ_idx.m1] * c.r)
                 +1 / (c.q[circ_idx.m1] * c.r^2)
                 +1 / (c.q * c.r^2)
-                +1 / (c.q * c.r[circ_idx.m1] * c.r)
+                +1 / (c.q * c.r[circ_idx.p1] * c.r)
                )
         Dp1[:] = @. -prefactor * (
                  1 / (c.q * c.r * c.r[circ_idx.p1])
@@ -194,8 +185,13 @@ function spdiagm_wrap(N::Int64, kv::Pair{Int64, Vector{Float64}}...)
         if k == 0
             new_kv = (new_kv..., 0 => v)
         else
-            new_kv = (new_kv..., k => v[1:N-abs(k)])
-            new_kv = (new_kv..., -sign(k)*(N-abs(k)) => v[N-abs(k)+1:end])
+            if k > 0
+                new_kv = (new_kv..., k => v[1:N-k])
+                new_kv = (new_kv..., k-N => v[N-k+1:end])
+            else
+                new_kv = (new_kv..., k => v[-k+1:end])
+                new_kv = (new_kv..., (N+k) => v[1:-k])
+            end
         end
     end
     return SA.spdiagm(new_kv...)
@@ -257,10 +253,34 @@ function update_θ(c::NucleusCoords, new_c::NucleusCoords,
                   + (W./new_c.q + W[circ_idx.m1]./new_c.q[circ_idx.m1])
                  )
 
+    """
+    From the documentation:
+    rem(x, y, r::RoundingMode)
+
+      Compute the remainder of x after integer division by y, with the quotient rounded according to the
+      rounding mode r. In other words, the quantity
+
+      x - y*round(x/y,r)
+
+      without any intermediate rounding.
+
+        •    if r == RoundNearest, then the result is exact, and in the interval [-|y|/2, |y|/2]. See
+            also RoundNearest.
+
+    So that rem.(x, 2π, RoundNearest) gives a float in [-π, π]
+    """
+    diff_pow_3 = 0.5P.N_kb*(-(rem.(c.θ[circ_idx.p1] - c.θ, 2π, RoundNearest)./c.q).^3 + (rem.(c.θ - c.θ[circ_idx.m1], 2π, RoundNearest)./c.q[circ_idx.m1]).^3)
+
     f[:] = (new_c.r.*c.θ/P.δt
-            + 0.5P.N_kb*(-((c.θ[circ_idx.p1] - c.θ)./c.q).^3 + ((c.θ - c.θ[circ_idx.m1])./c.q[circ_idx.m1]).^3)
+            + diff_pow_3
             + 0.5*vec(CSC.@dotprod(∇W, (c.n[circ_idx.p1,:] + c.n)) + CSC.@dotprod(∇W[circ_idx.m1,:], (c.n + c.n[circ_idx.m1,:])))
            )
+
+    # Periodic boundary conditions:
+    f[1] += 2π*(Dm2[1] + Dm1[1])
+    f[2] += 2π*Dm2[2]
+    f[end]   -= 2π*(Dp2[end] + Dp1[end])
+    f[end-1] -= 2π*Dp2[end-1]
 
     M = spdiagm_wrap(P.Nnuc,
                      -2 => Dm2,
@@ -349,11 +369,21 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     N_W = potentials.N_W
     N_∇W = potentials.N_∇W
 
+    # DEBUG
+    println("PRE alpha, beta, r, K, θ")
+    display([c.α c.β c.r c.k c.θ])
+    println()
+
     update_alphabeta(c, new_c, N_W, N_∇W, P, F)
     update_r(c, new_c, N_W, N_∇W, P, F)
     update_K(c, new_c, N_W, N_∇W, P, F, temparrays)
     update_θ(c, new_c, N_W, N_∇W, P, F, temparrays)
     update_Y(c, new_c, N_W, N_∇W, P, F, temparrays)
+
+    # DEBUG
+    println("POST alpha, beta, r, K, θ")
+    display([new_c.α c.β new_c.r new_c.k new_c.θ])
+    println()
 end
 
 end # module Nucleus

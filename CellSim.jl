@@ -266,10 +266,6 @@ function main()
 
     # outer loop
     while k < P.M
-        #
-        # DEBUG
-        display(nucleus_coords.k)
-        println()
         key = read(stdin, 1)
 
         k += 1
