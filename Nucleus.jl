@@ -110,6 +110,8 @@ function update_alphabeta(c::NucleusCoords, new_c::NucleusCoords,
                           P::Params, F::Flags)
     circ_idx = new_c.circ_idx
 
+    c.L = sum(c.r)
+
     c.β[:] = (
               P.N_kb./c.r .*((c.k[circ_idx.p1]-c.k)./c.q - (c.k - c.k[circ_idx.m1])./c.q[circ_idx.m1])
               + 0.5P.N_kb*c.k.^3
@@ -369,10 +371,11 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     N_W = potentials.N_W
     N_∇W = potentials.N_∇W
 
-    # DEBUG
-    println("PRE alpha, beta, r, K, θ")
-    display([c.α c.β c.r c.k c.θ])
-    println()
+    if DEBUG
+        println("PRE alpha, beta, r, K, θ")
+        display([c.α c.β c.r c.k c.θ])
+        println()
+    end
 
     update_alphabeta(c, new_c, N_W, N_∇W, P, F)
     update_r(c, new_c, N_W, N_∇W, P, F)
@@ -380,10 +383,11 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     update_θ(c, new_c, N_W, N_∇W, P, F, temparrays)
     update_Y(c, new_c, N_W, N_∇W, P, F, temparrays)
 
-    # DEBUG
-    println("POST alpha, beta, r, K, θ")
-    display([new_c.α c.β new_c.r new_c.k new_c.θ])
-    println()
+    if DEBUG
+        println("POST alpha, beta, r, K, θ")
+        display([new_c.α c.β new_c.r new_c.k new_c.θ])
+        println()
+    end
 end
 
 end # module Nucleus
