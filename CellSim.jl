@@ -4,6 +4,7 @@ const DEBUG = "DEBUG" in keys(ENV)
 
 import CellSimCommon
 const CSC = CellSimCommon
+
 import Cortex
 import Nucleus
 import Wall
@@ -41,7 +42,7 @@ function compute_initial_x(P::CSC.Params, F::CSC.Flags; convex::Bool=true)
         if !F.circular_wall
             return 0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)]
         else
-            return 0.5 * Float64[P.x0_a*cospi.(2t)+2P.polar_shift P.x0_b*sinpi.(2t)]
+            return 0.5 * Float64[P.x0_a*cospi.(2t) .+ 2P.polar_shift P.x0_b*sinpi.(2t)]
         end
     end
 
@@ -268,6 +269,7 @@ function main()
 
     # outer loop
     while k < P.M
+
         if DEBUG
             key = read(stdin, 1)
         end
