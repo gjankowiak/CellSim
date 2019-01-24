@@ -1,5 +1,7 @@
 module CellSim
 
+const DEBUG = "DEBUG" in keys(ENV)
+
 import CellSimCommon
 const CSC = CellSimCommon
 import Cortex
@@ -266,7 +268,9 @@ function main()
 
     # outer loop
     while k < P.M
-        key = read(stdin, 1)
+        if DEBUG
+            key = read(stdin, 1)
+        end
 
         k += 1
         print("\b"^100)
