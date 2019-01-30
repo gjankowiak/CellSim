@@ -17,8 +17,7 @@ import Centrosome
 import LinearAlgebra
 const LA = LinearAlgebra
 
-import Utils
-import SurfacesCommon
+import JankoUtils
 import EvenParam
 
 import NLsolve
@@ -189,7 +188,7 @@ function main()
                 x_init = EvenParam.reparam(x_init; closed=true, new_N=P.N)
             end
 
-            if !Utils.check_ccw_polygon(x_init)
+            if !JankoUtils.check_ccw_polygon(x_init)
                 println("[info] reversing initial condition")
                 @views begin
                     reverse!(x_init[:,1])

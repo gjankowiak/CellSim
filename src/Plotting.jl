@@ -12,7 +12,7 @@ import Centrosome
 import Cortex
 import Nucleus
 import Wall
-import Utils
+import JankoUtils
 
 function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellSimCommon.Flags)
 
@@ -336,7 +336,7 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
     # else
         # scatters[1][:set_sizes](0CellSimCommon.@entry_norm(plotables.drag_force))
     # end
-    # scatters[1][:set_facecolor](Utils.scale_cm(plotables.mass_source, PyPlot.get_cmap("RdYlGn");
+    # scatters[1][:set_facecolor](JankoUtils.scale_cm(plotables.mass_source, PyPlot.get_cmap("RdYlGn");
                                                # range_min=-P.c, range_max=P.c))
 
 

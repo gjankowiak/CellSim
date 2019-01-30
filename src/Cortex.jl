@@ -7,7 +7,7 @@ using CellSimCommon
 const CSC = CellSimCommon
 
 import Wall, Masks
-import Utils: spdiagm_const, idxmod
+import JankoUtils: spdiagm_const, idxmod
 
 import SparseArrays
 const SA = SparseArrays
