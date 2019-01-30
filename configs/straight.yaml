@@ -36,6 +36,15 @@ params:
     k_MT: 5e-4
     MT_potential_power: -2
     MT_factor: 1e-1
+    #
+    # Nucleus related parameters
+    Nnuc: 20   # number of points on the nucleus
+    N_P: -0e-4 # pressure
+    N_kb: 1e-4 # bending stiffness
+    N_ω:  1e-1 # inplane stiffness
+    N_kc: 0e2 # centrosome link stiffness
+    N_l0c: 0e0 # centrosome link rest length
+    N_r_init: 1e-2 # initial nucleus radius
 
 flags:
     confine:              true
@@ -53,6 +62,7 @@ flags:
     circular_wall:        false
     cortex:               true
     centrosome:           true
+    nucleus:              false
     follow_cam:           true
 
 load_state:
