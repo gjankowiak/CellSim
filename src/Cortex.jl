@@ -232,7 +232,7 @@ function init_FD_matrices(P::Params)
     global D5_perp  = ([[SA.spzeros(N,N) -D5_short];[D5_short SA.spzeros(N,N)]])
 
     if DEBUG
-        dump = open("dump_finite_differences_matrices_1.0.txt", "w")
+        dump = open("dumps/dump_finite_differences_matrices_1.0.txt", "w")
 
         write(dump, "M_perp\n")
         show(dump, "text/plain", M_perp)
@@ -360,7 +360,7 @@ function compute_pressure_force(coords::PointCoords, P::Params,
                                 add::Bool=false)
 
     if DEBUG
-        w = open("dump_pressure_f_1.0.txt", "w")
+        w = open("dumps/dump_pressure_f_1.0.txt", "w")
         tmp = -P.P*D1c_perp*vec(coords.x)
         show(w, "text/plain", tmp)
         write(w, "\n")
@@ -378,7 +378,7 @@ function compute_pressure_force(coords::PointCoords, P::Params,
                                 add::Bool=false)
 
     if DEBUG
-        w = open("dump_pressure_Df_1.0.txt", "w")
+        w = open("dumps/dump_pressure_Df_1.0.txt", "w")
         tmp = -P.P*D1c_perp
         show(w, "text/plain", tmp)
         write(w, "\n")
@@ -399,7 +399,7 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
                                add::Bool=false)
 
     if DEBUG
-        w = open("dump_elastic_f_1.0.txt", "w")
+        w = open("dumps/dump_elastic_f_1.0.txt", "w")
         tmp = P.K * (coords.ell.*coords.τ .- coords_s.ell_m.*coords_s.τ_m)/P.Δσ
         show(w, "text/plain", tmp)
         write(w, "\n")
@@ -418,7 +418,7 @@ function compute_elastic_force(coords::PointCoords, coords_s::PointCoordsShifted
                                add::Bool=false)
 
     if DEBUG
-        w = open("dump_elastic_Df_1.0.txt", "w")
+        w = open("dumps/dump_elastic_Df_1.0.txt", "w")
         tmp = P.K * (CSC.pointwise_projection(coords.τ)*D1p .- CSC.pointwise_projection(coords_s.τ_m)*D1m
                                .+ (CSC.@bc_scalar(coords.ell).*diffs.Dτ .- CSC.@bc_scalar(coords_s.ell_m).*diffs.Dτ_m)
                               )/P.Δσ
@@ -448,7 +448,7 @@ function compute_confinement_force(coords::PointCoords,
     end
 
     if DEBUG
-        w = open("dump_confinement_f_1.0.txt", "w")
+        w = open("dumps/dump_confinement_f_1.0.txt", "w")
         tmp = vec(-∇field)
         show(w, "text/plain", tmp)
         write(w, "\n")
@@ -476,7 +476,7 @@ function compute_confinement_force(coords::PointCoords,
     end
 
     if DEBUG
-        w = open("dump_confinement_Df_1.0.txt", "w")
+        w = open("dumps/dump_confinement_Df_1.0.txt", "w")
         tmp = - H_field
         show(w, "text/plain", tmp)
         write(w, "\n")

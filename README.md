@@ -40,3 +40,25 @@ It can take a really long time (30 seconds or more) to start because of the init
 ## Configuration files
 
 The models parameters are defined in YAML files located in the `configs` directory. You can of course copy and edit those. There are a large number of parameters, which are explained in short comments.
+
+## Troubleshooting
+
+If you get an error like the following:
+
+```
+[NSApplication _setup:]
+: unrecognized selector sent to instance 0x7f9183705170
+2019-01-30 17:23:30.788 julia[2002:154898] *** Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: '-[NSApplication _setup:]: unrecognized selector sent to instance 0x7f9183705170'
+
+in expression starting at /Users/chiaragiverso/CellSim/run.jl:5
+__pthread_kill at /usr/lib/system/libsystem_kernel.dylib (unknown line)
+Allocations: 104904598 (Pool: 104879133; Big: 25465); GC: 227
+Abort trap: 6
+```
+
+you can try installing PyPlot via julia directly:
+```
+    julia> ]
+    pkg> add Conda
+    julia> 
+```

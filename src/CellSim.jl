@@ -117,6 +117,7 @@ function main()
         y_params["Nnuc"],
         y_params["N_P"],
         y_params["N_kb"],
+        y_params["N_kcont"],
         y_params["N_ω"],
         y_params["N_kc"],
         y_params["N_l0c"],
@@ -220,6 +221,12 @@ function main()
     if F.nucleus
         old_nucleus_coords = Nucleus.initialize_coords(P, F, coords)
         nucleus_coords = Nucleus.initialize_coords(P, F, coords)
+        #
+        # DEBUG
+        # Y - sum(Y)/n + [0.0, 0.18]
+        old_nucleus_coords.Y[:] = old_nucleus_coords.Y .- sum(old_nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 0.18]
+        nucleus_coords.Y[:] = nucleus_coords.Y .- sum(nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 0.18]
+
         temparrays = CSC.TempArrays6(
                                      zeros(P.Nnuc),
                                      zeros(P.Nnuc),
@@ -273,6 +280,10 @@ function main()
             key = read(stdin, 1)
         end
 
+        if key == "q"
+            break
+        end
+
         k += 1
         print("\b"^100)
         println(" iteration #", k, ", ")
@@ -288,7 +299,8 @@ function main()
             fill!(potentials.C_∇W, 0.0)
             fill!(potentials.CS_∇W, 0.0)
             Nucleus.compute_contact_force(potentials, coords, nucleus_coords, P, F)
-            Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
+            # DEBUG
+            # Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
             Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays)
 
             Nucleus.copy(old_nucleus_coords, nucleus_coords)
