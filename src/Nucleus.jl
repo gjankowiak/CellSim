@@ -88,13 +88,16 @@ function compute_contact_force(pots::CSC.InteractionPotentials,
     # pots.N_∇W[:] = ∇pot
 
     # Increasing in X
-    # pots.N_W[:] = c.Y[:,1]
-    # pots.N_∇W[:] = [ones(size(c.Y, 1)) zeros(size(c.Y, 1))]
+    pots.N_W[:] = c.Y[:,1]
+    pots.N_∇W[:] = [ones(size(c.Y, 1)) zeros(size(c.Y, 1))]
 
     # Constant W
     # pots.N_W[:] = ones(size(c.Y, 1))
     # pots.N_∇W[:] = zeros(size(c.Y, 1), 2)
 
+    # Zero W
+    # fill!(pots.N_W, 0.0)
+    # fill!(pots.N_∇W, 0.0)
 
     # Interaction with the cortex
     # for i in 1:P.Nnuc
@@ -148,6 +151,7 @@ function update_alphabeta(c::NucleusCoords, new_c::NucleusCoords,
               - 0.5*(W+W[circ_idx.m1]).*c.k
               - 0.5vec(sum(c.n.*(∇W+∇W[circ_idx.m1,:]); dims=2))
              )
+
     # for plotting only
     new_c.β[:] = c.β
 
@@ -166,6 +170,7 @@ function update_r(c::NucleusCoords, new_c::NucleusCoords,
                   P::Params, F::Flags)
     new_c.η[:] = c.η + P.δt*(c.k .* c.β +(new_c.α - new_c.α[new_c.circ_idx.m1])./c.r)
     new_c.r[:] = exp.(new_c.η)
+    new_c.q[:] = 0.5*(new_c.r + new_c.r[new_c.circ_idx.p1])
 end
 
 function finite_differences_3(new_c::NucleusCoords,
@@ -336,19 +341,8 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
 
     finite_differences_3(new_c, Dm2, Dm1, D0, Dp1, Dp2; prefactor=P.N_kb, dual=true)
 
-    # Dm1[:] = Dm1 + 1.5P.N_kb*new_c.k.^2 ./new_c.r + 0.5new_c.α - W./new_c.r
-    # Dp1[:] = Dp1 + 1.5P.N_kb*new_c.k[circ_idx.p1].^2 ./new_c.r[circ_idx.p1] - 0.5new_c.α - W./new_c.r[circ_idx.p1]
-
-    # DEBUG
-    # Dm1[:] = Dm1 + 0P.N_kb*new_c.k.^2 ./new_c.r + 0.5new_c.α - W./new_c.r
-    # Dp1[:] = Dp1 + 0P.N_kb*new_c.k[circ_idx.p1].^2 ./new_c.r[circ_idx.p1] - 0.5new_c.α - W./new_c.r[circ_idx.p1]
-    #
-    fill!(Dm2, 0.0)
-    fill!(D0, 0.0)
-    fill!(Dp2, 0.0)
-    Dm1[:] = 1.5P.N_kb*new_c.k.^2 ./new_c.r + 0.5new_c.α - W./new_c.r
-    Dp1[:] = 1.5P.N_kb*new_c.k[circ_idx.p1].^2 ./new_c.r[circ_idx.p1] - 0.5new_c.α - W./new_c.r[circ_idx.p1]
-    # END DEBUG
+    Dm1[:] = Dm1 + 1.5P.N_kb*new_c.k.^2 ./new_c.r + 0.5new_c.α - W./new_c.r
+    Dp1[:] = Dp1 + 1.5P.N_kb*new_c.k[circ_idx.p1].^2 ./new_c.r[circ_idx.p1] - 0.5new_c.α - W./new_c.r[circ_idx.p1]
 
     D0[:] = new_c.q/P.δt - (Dm2 + Dm1 + Dp1 + Dp2)
 
@@ -364,7 +358,6 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
               )
         )
 
-
     _M = spdiagm_wrap(P.Nnuc,
                       -2 => Dm2,
                       -1 => Dm1,
@@ -375,6 +368,10 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
     M = CSC.@repdiagblk(_M, 2)
 
     new_c.Y[:] = M\f
+
+    ## DEBUG
+    print("<d_t Y.n> = ")
+    println(sum(CSC.@dotprod((new_c.Y .- c.Y) / P.δt, n))/P.Nnuc)
 end
 
 function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords)
@@ -392,11 +389,11 @@ function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords)
         zeros(P.Nnuc), # α
         zeros(P.Nnuc), # β
         1/P.N_r_init * ones(P.Nnuc), # k
-        sin(π/P.Nnuc)*P.N_r_init * ones(P.Nnuc), # r
-        sin(π/P.Nnuc)*P.N_r_init * ones(P.Nnuc), # q
+        sin(π/P.Nnuc)*2P.N_r_init * ones(P.Nnuc), # r
+        sin(π/P.Nnuc)*2P.N_r_init * ones(P.Nnuc), # q
         θ, # θ
         [sin.(θ) -cos.(θ)], # n
-        log.(sin(π/P.Nnuc)*P.N_r_init * ones(P.Nnuc)), # η
+        log.(sin(π/P.Nnuc)*2P.N_r_init * ones(P.Nnuc)), # η
         2π*P.N_r_init, # L
         CSC.init_circ_idx(P.Nnuc) # circ_idx
        )
@@ -417,8 +414,8 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     # fill!(N_∇W, 0.0)
 
     if DEBUG
-        println("PRE alpha, beta, r, K, θ")
-        display([c.α c.β c.r c.k c.θ])
+        println("PRE alpha, beta, r, q, K, θ")
+        display([c.α c.β c.r c.q c.k c.θ])
         println()
     end
 
@@ -429,8 +426,8 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     update_Y(c, new_c, N_W, N_∇W, P, F, temparrays)
 
     if DEBUG
-        println("POST alpha, beta, r, K, θ")
-        display([new_c.α new_c.β new_c.r new_c.k new_c.θ])
+        println("POST alpha, beta, r, q, K, θ")
+        display([new_c.α new_c.β new_c.r new_c.q new_c.k new_c.θ])
         println()
     end
 end
