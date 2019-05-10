@@ -39,7 +39,7 @@ params:
     #
     # Nucleus related parameters
     Nnuc: 50   # number of points on the nucleus
-    N_P: 0e1 # pressure
+    N_P: -1e1 # pressure
     N_kb: 1e-2 # bending stiffness
     N_ω:  1e-1 # inplane stiffness
     N_kcont: 1e0 # contact force intensity

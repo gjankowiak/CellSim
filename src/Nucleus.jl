@@ -77,19 +77,9 @@ function compute_contact_force(pots::CSC.InteractionPotentials,
                                P::Params, F::Flags)
 
     # DEBUG
-    # bc = sum(c.Y; dims=1)/size(c.Y, 1)
-    # xy = c.Y .- bc
-    # d = sqrt.(sum(abs2, xy; dims=2))
-    # xy_norm = xy ./ d
-    # pot = P.N_kcont*g(vec(0.35 .- d), 1.0)
-    # ∇pot = -P.N_kcont * xy_norm .* g_p(vec(0.35 .- d), 1.0)
-
-    # pots.N_W[:] = pot
-    # pots.N_∇W[:] = ∇pot
-
     # Increasing in X
-    pots.N_W[:] = c.Y[:,1]
-    pots.N_∇W[:] = [ones(size(c.Y, 1)) zeros(size(c.Y, 1))]
+    # pots.N_W[:] = c.Y[:,1]
+    # pots.N_∇W[:] = [ones(size(c.Y, 1)) zeros(size(c.Y, 1))]
 
     # Constant W
     # pots.N_W[:] = ones(size(c.Y, 1))
@@ -108,18 +98,18 @@ function compute_contact_force(pots::CSC.InteractionPotentials,
     # end
     # END DEBUG
 
-    # for i in 1:P.Nnuc
-        # xy = cor_coords.x .- c.Y[i,:]'
-        # d = sqrt.(sum(abs2, xy; dims=2))
-        # xy_norm = xy ./ d
+    for i in 1:P.Nnuc
+        xy = cor_coords.x .- c.Y[i,:]'
+        d = sqrt.(sum(abs2, xy; dims=2))
+        xy_norm = xy ./ d
 
-        # pot = g(vec(d), 10.0)
-        # ∇pot = -xy_norm .* g_p(vec(d), 10.0)
+        pot = g(vec(d), 10.0)
+        ∇pot = -xy_norm .* g_p(vec(d), 10.0)
 
-        # pots.C_∇W[:] = pots.C_∇W - ∇pot
-        # pots.N_W[i] = pots.N_W[i] + sum(pot)
-        # pots.N_∇W[i,:] = pots.N_∇W[i,:] + vec(sum(∇pot; dims=1))
-    # end
+        pots.C_∇W[:] = pots.C_∇W - ∇pot
+        pots.N_W[i] = pots.N_W[i] + sum(pot)
+        pots.N_∇W[i,:] = pots.N_∇W[i,:] + vec(sum(∇pot; dims=1))
+    end
 end
 
 function compute_centronuclear_force(pots::CSC.InteractionPotentials,
@@ -283,11 +273,11 @@ function update_θ(c::NucleusCoords, new_c::NucleusCoords,
     finite_differences_3(new_c, Dm2, Dm1, D0, Dp1, Dp2; prefactor=P.N_kb)
 
     Dm1[:] = Dm1 + 0.5new_c.α[circ_idx.m1] - W[circ_idx.m1]./new_c.q[circ_idx.m1]
-    Dp1[:] = Dp1 - 0.5new_c.α - W./new_c.q
+    Dp1[:] = Dp1 - 0.5new_c.α              - W./new_c.q
 
     D0[:] = D0 + (
                   new_c.r/P.δt
-                  + 0.5*(new_c.α + new_c.α[circ_idx.m1])
+                  + 0.5*(new_c.α - new_c.α[circ_idx.m1])
                   + (W./new_c.q + W[circ_idx.m1]./new_c.q[circ_idx.m1])
                  )
 
@@ -368,10 +358,6 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
     M = CSC.@repdiagblk(_M, 2)
 
     new_c.Y[:] = M\f
-
-    ## DEBUG
-    print("<d_t Y.n> = ")
-    println(sum(CSC.@dotprod((new_c.Y .- c.Y) / P.δt, n))/P.Nnuc)
 end
 
 function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords)
@@ -410,6 +396,7 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     N_W = potentials.N_W
     N_∇W = potentials.N_∇W
 
+    # DEBUG
     # fill!(N_W, 0.0)
     # fill!(N_∇W, 0.0)
 

@@ -299,8 +299,7 @@ function main()
             fill!(potentials.C_∇W, 0.0)
             fill!(potentials.CS_∇W, 0.0)
             Nucleus.compute_contact_force(potentials, coords, nucleus_coords, P, F)
-            # DEBUG
-            # Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
+            Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
             Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays)
 
             Nucleus.copy(old_nucleus_coords, nucleus_coords)
