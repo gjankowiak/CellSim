@@ -108,7 +108,7 @@ function compute_contact_force(pots::CSC.InteractionPotentials,
         pot = g(vec(d), 10.0)
         ∇pot = -xy_norm .* g_p(vec(d), 10.0)
 
-        pots.C_∇W[:] = pots.C_∇W + ∇pot
+        pots.C_∇W[:] = pots.C_∇W - ∇pot
         pots.N_W[i] = pots.N_W[i] + sum(pot)
         pots.N_∇W[i,:] = pots.N_∇W[i,:] + vec(sum(∇pot; dims=1))
     end
