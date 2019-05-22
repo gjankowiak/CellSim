@@ -45,11 +45,11 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
             ax[:fill](zeros(P.Nnuc), zeros(P.Nnuc), color="yellow", zorder=16)[1]
 
             # Normals
-            ax[:quiver](zeros(P.Nnuc), zeros(P.Nnuc),
-                        zeros(P.Nnuc), zeros(P.Nnuc), zorder=100, units="xy", scale_units="xy", scale=1e1, width=1e-2)
+            # ax[:quiver](zeros(P.Nnuc), zeros(P.Nnuc),
+                        # zeros(P.Nnuc), zeros(P.Nnuc), zorder=100, units="xy", scale_units="xy", scale=1e1, width=1e-2)
             # Velocity
-            ax[:quiver](zeros(P.Nnuc), zeros(P.Nnuc),
-                        zeros(P.Nnuc), zeros(P.Nnuc), color="blue", zorder=100, units="xy", scale_units="xy", scale=1e1, width=5e-3)
+            # ax[:quiver](zeros(P.Nnuc), zeros(P.Nnuc),
+                        # zeros(P.Nnuc), zeros(P.Nnuc), color="blue", zorder=100, units="xy", scale_units="xy", scale=1e1, width=5e-3)
         end
 
         # Drag force
@@ -220,22 +220,20 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
             idx_p += 1
 
             # normal-s
-            midpoints = 0.5*(nucleus_coords.Y+circshift(nucleus_coords.Y, 1))
-            scatters[idx_s][:set_offsets](midpoints)
-            scatters[idx_s][:set_UVC](nucleus_coords.n[:,1], nucleus_coords.n[:,2])
-            idx_s += 1
+            # midpoints = 0.5*(nucleus_coords.Y+circshift(nucleus_coords.Y, 1))
+            # scatters[idx_s][:set_offsets](midpoints)
+            # scatters[idx_s][:set_UVC](nucleus_coords.n[:,1], nucleus_coords.n[:,2])
+            # idx_s += 1
 
 
             # velocity
             #
-            velocity_x = -nucleus_coords.α[:] .* nucleus_coords.n[:,2] + nucleus_coords.β[:] .* nucleus_coords.n[:,1]
-            velocity_y = nucleus_coords.α[:] .* nucleus_coords.n[:,1] + nucleus_coords.β[:] .* nucleus_coords.n[:,2]
+            # velocity_x = -nucleus_coords.α[:] .* nucleus_coords.n[:,2] + nucleus_coords.β[:] .* nucleus_coords.n[:,1]
+            # velocity_y = nucleus_coords.α[:] .* nucleus_coords.n[:,1] + nucleus_coords.β[:] .* nucleus_coords.n[:,2]
 
-            println(velocity_x, velocity_y)
-
-            scatters[idx_s][:set_offsets](midpoints)
-            scatters[idx_s][:set_UVC](velocity_x, velocity_y)
-            idx_s += 1
+            # scatters[idx_s][:set_offsets](midpoints)
+            # scatters[idx_s][:set_UVC](velocity_x, velocity_y)
+            # idx_s += 1
         end
 
         # Drag force

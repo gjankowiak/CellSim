@@ -42,6 +42,7 @@ params:
     N_P: -1e1 # pressure
     N_kb: 1e-2 # bending stiffness
     N_ω:  1e-1 # inplane stiffness
+    N_W0: 2e0  # potential offset
     N_kcont: 1e0 # contact force intensity
     N_kc: 0e2 # centrosome link stiffness
     N_l0c: 0e0 # centrosome link rest length

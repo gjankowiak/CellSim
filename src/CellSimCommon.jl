@@ -78,6 +78,7 @@ struct Params
     N_P::Float64  # pressure
     N_kb::Float64 # bending stiffness
     N_ω::Float64  # inplane stiffness
+    N_W0::Float64  # potential offset
     N_kcont::Float64 # contact force intensity
     N_kc::Float64 # centrosome link stiffness
     N_l0c::Float64 # centrosome link rest length

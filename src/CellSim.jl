@@ -119,6 +119,7 @@ function main()
         y_params["N_kb"],
         y_params["N_kcont"],
         y_params["N_ω"],
+        y_params["N_W0"],
         y_params["N_kc"],
         y_params["N_l0c"],
         y_params["N_r_init"]
@@ -168,6 +169,10 @@ function main()
         println(string("    ", s, ": ", getfield(F, s)))
     end
     println(" ")
+
+    if DEBUG
+        println("*** DEBUG MODE ***")
+    end
 
     plotables = CSC.new_plotables(P.N)
 
@@ -278,10 +283,10 @@ function main()
 
         if DEBUG
             key = read(stdin, 1)
-        end
+            if key == "q"
+                break
+            end
 
-        if key == "q"
-            break
         end
 
         k += 1
@@ -331,8 +336,7 @@ function main()
         end
 
         # plot
-        # plot_period = F.write_animation ? 1 : 1
-        plot_period = F.write_animation ? 1 : 1
+        plot_period = (F.write_animation || DEBUG) ? 1 : 1
         if (F.plot & (k % plot_period == 0))
             Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
