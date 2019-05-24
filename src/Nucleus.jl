@@ -1,9 +1,5 @@
 module Nucleus
 
-const DEBUG = "DEBUG" in keys(ENV)
-
-# println("DEBUG: ", DEBUG)
-
 import Cortex: PointCoords, PointCoordsShifted
 
 using CellSimCommon
@@ -382,11 +378,7 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     N_W = potentials.N_W
     N_∇W = potentials.N_∇W
 
-    # DEBUG
-    # fill!(N_W, 0.0)
-    # fill!(N_∇W, 0.0)
-
-    if DEBUG
+    if F.DEBUG
         println("PRE alpha, beta, r, q, K, θ")
         display([c.α c.β c.r c.q c.k c.θ])
         println()
@@ -398,7 +390,7 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     update_θ(c, new_c, N_W, N_∇W, P, F, temparrays)
     update_Y(c, new_c, N_W, N_∇W, P, F, temparrays)
 
-    if DEBUG
+    if F.DEBUG
         println("POST alpha, beta, r, q, K, θ")
         display([new_c.α new_c.β new_c.r new_c.q new_c.k new_c.θ])
         println()

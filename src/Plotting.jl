@@ -6,7 +6,6 @@ import Printf
 import PyPlot
 import PyCall
 
-# animation = PyCall.pywrap(PyCall.pyimport("matplotlib.animation"))
 animation = PyCall.pyimport("matplotlib.animation")
 
 import CellSimCommon

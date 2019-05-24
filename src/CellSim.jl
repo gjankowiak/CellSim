@@ -1,7 +1,5 @@
 module CellSim
 
-const DEBUG = "DEBUG" in keys(ENV)
-
 import CellSimCommon
 const CSC = CellSimCommon
 
@@ -156,7 +154,10 @@ function main()
 
           # output options
           y_flags["dryrun"],
-          y_flags["write_animation"]
+          y_flags["write_animation"],
+
+          # debug
+          y_flags["debug"]
     )
 
     println("Parameters:")
@@ -171,7 +172,7 @@ function main()
     end
     println(" ")
 
-    if DEBUG
+    if F.DEBUG
         println("*** DEBUG MODE ***")
     end
 
@@ -282,7 +283,7 @@ function main()
     # outer loop
     while k < P.M
 
-        if DEBUG
+        if F.DEBUG
             key = read(stdin, 1)
             if key == "q"
                 break
@@ -337,7 +338,7 @@ function main()
         end
 
         # plot
-        plot_period = (F.write_animation || DEBUG) ? 1 : 1
+        plot_period = (F.write_animation || F.DEBUG) ? 1 : 1
         if (F.plot & (k % plot_period == 0))
             Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation

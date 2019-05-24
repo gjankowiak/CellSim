@@ -111,6 +111,9 @@ struct Flags
     # output options
     dryrun::Bool
     write_animation::Bool
+
+    # debug
+    DEBUG::Bool
 end
 
 struct InteractionPotentials

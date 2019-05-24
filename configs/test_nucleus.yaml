@@ -1,6 +1,6 @@
 params:
     N: 250 # number of points
-    M: 10000 # max. number of iterations
+    M: 500 # max. number of iterations
 
     δt: 2e-4 # time step
 
@@ -38,20 +38,21 @@ params:
     MT_factor: 1e-1
     #
     # Nucleus related parameters
-    Nnuc: 50   # number of points on the nucleus
+    Nnuc: 200   # number of points on the nucleus
     N_P: -1e1 # pressure
     N_kb: 1e-2 # bending stiffness
     N_ω:  1e-1 # inplane stiffness
     N_W0: 2e0  # potential offset
-    N_kcont: 1e0 # contact force intensity
-    N_kc: 0e2 # centrosome link stiffness
+    N_kcont: 0e0 # contact force intensity
+    N_αcont: 5e1 # contact force sharpness
+    N_kc: 0e0 # centrosome link stiffness
     N_l0c: 0e0 # centrosome link rest length
     N_r_init: 3.0e-1 # initial nucleus radius
 
 flags:
     confine:              true
     adjust_drag:          false
-    polymerize:           true
+    polymerize:           false
     dryrun:               true
     plot:                 true
     pretty:               false
@@ -66,6 +67,7 @@ flags:
     centrosome:           true
     nucleus:              true
     follow_cam:           false
+    debug:                false
 
 load_state:
     do_load: true
