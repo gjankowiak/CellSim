@@ -78,17 +78,19 @@ function compute_contact_force(pots::CSC.InteractionPotentials,
                                cor_coords::PointCoords, c::NucleusCoords,
                                P::Params, F::Flags)
 
-    for i in 1:P.Nnuc
-        xy = cor_coords.x .- c.Y[i,:]'
-        d = sqrt.(sum(abs2, xy; dims=2))
-        xy_norm = xy ./ d
+    if P.N_kcont > 0
+        for i in 1:P.Nnuc
+            xy = cor_coords.x .- c.Y[i,:]'
+            d = sqrt.(sum(abs2, xy; dims=2))
+            xy_norm = xy ./ d
 
-        pot = g(vec(d), P.N_αcont)
-        ∇pot = -xy_norm .* g_p(vec(d), P.N_αcont)
+            pot = P.N_kcont*g(vec(d), P.N_αcont)
+            ∇pot = -P.N_kcont * xy_norm .* g_p(vec(d), P.N_αcont)
 
-        pots.C_∇W[:] = pots.C_∇W - ∇pot
-        pots.N_W[i] = pots.N_W[i] + sum(pot)
-        pots.N_∇W[i,:] = pots.N_∇W[i,:] + vec(sum(∇pot; dims=1))
+            pots.C_∇W[:] = pots.C_∇W - ∇pot
+            pots.N_W[i] = pots.N_W[i] + sum(pot)
+            pots.N_∇W[i,:] = pots.N_∇W[i,:] + vec(sum(∇pot; dims=1))
+        end
     end
 
     pots.N_W[:] = pots.N_W .+ P.N_W0
@@ -98,14 +100,16 @@ function compute_centronuclear_force(pots::CSC.InteractionPotentials,
                                      cor_coords::PointCoords, c::NucleusCoords,
                                      P::Params, F::Flags)
 
-    Yc = c.Y .- cor_coords.centro_x'
-    d = sqrt.(sum(abs2, Yc; dims=2))
-    Yc_norm = Yc ./ d
+    if P.N_kc > 0
+        Yc = c.Y .- cor_coords.centro_x'
+        d = sqrt.(sum(abs2, Yc; dims=2))
+        Yc_norm = Yc ./ d
 
-    pots.CS_∇W[:] = pots.CS_∇W + sum(P.N_kc * (d .- P.N_l0c) .* Yc_norm; dims=1)
+        pots.CS_∇W[:] = pots.CS_∇W + sum(P.N_kc * (d .- P.N_l0c) .* Yc_norm; dims=1)
 
-    pots.N_W[:] = pots.N_W + 0.5*P.N_kc/P.Nnuc*(d .- P.N_l0c).^2
-    pots.N_∇W[:] = pots.N_∇W - repeat(pots.CS_∇W, P.Nnuc)/P.Nnuc
+        pots.N_W[:] = pots.N_W + 0.5*P.N_kc/P.Nnuc*(d .- P.N_l0c).^2
+        pots.N_∇W[:] = pots.N_∇W - repeat(pots.CS_∇W, P.Nnuc)/P.Nnuc
+    end
 end
 
 function update_alphabeta(c::NucleusCoords, new_c::NucleusCoords,
