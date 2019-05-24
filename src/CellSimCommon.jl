@@ -80,6 +80,7 @@ struct Params
     N_ω::Float64  # inplane stiffness
     N_W0::Float64  # potential offset
     N_kcont::Float64 # contact force intensity
+    N_αcont::Float64 # contact force sharpness
     N_kc::Float64 # centrosome link stiffness
     N_l0c::Float64 # centrosome link rest length
     N_r_init::Float64 # initial nucleus radius

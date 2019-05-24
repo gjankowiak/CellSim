@@ -117,9 +117,10 @@ function main()
         y_params["Nnuc"],
         y_params["N_P"],
         y_params["N_kb"],
-        y_params["N_kcont"],
         y_params["N_ω"],
         y_params["N_W0"],
+        y_params["N_kcont"],
+        y_params["N_αcont"],
         y_params["N_kc"],
         y_params["N_l0c"],
         y_params["N_r_init"]

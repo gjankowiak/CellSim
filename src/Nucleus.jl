@@ -78,35 +78,13 @@ function compute_contact_force(pots::CSC.InteractionPotentials,
                                cor_coords::PointCoords, c::NucleusCoords,
                                P::Params, F::Flags)
 
-    # DEBUG
-    # Increasing in X
-    # pots.N_W[:] = c.Y[:,1]
-    # pots.N_∇W[:] = [ones(size(c.Y, 1)) zeros(size(c.Y, 1))]
-
-    # Constant W
-    # pots.N_W[:] = ones(size(c.Y, 1))
-    # pots.N_∇W[:] = zeros(size(c.Y, 1), 2)
-
-    # Zero W
-    # fill!(pots.N_W, 0.0)
-    # fill!(pots.N_∇W, 0.0)
-
-    # Interaction with the cortex
-    # for i in 1:P.Nnuc
-
-        # pots.C_∇W[:] = pots.C_∇W - ∇pot
-        # pots.N_W[i] = pots.N_W[i] + sum(pot)
-        # pots.N_∇W[i,:] = pots.N_∇W[i,:] + vec(sum(∇pot; dims=1))
-    # end
-    # END DEBUG
-
     for i in 1:P.Nnuc
         xy = cor_coords.x .- c.Y[i,:]'
         d = sqrt.(sum(abs2, xy; dims=2))
         xy_norm = xy ./ d
 
-        pot = g(vec(d), 10.0)
-        ∇pot = -xy_norm .* g_p(vec(d), 10.0)
+        pot = g(vec(d), P.N_αcont)
+        ∇pot = -xy_norm .* g_p(vec(d), P.N_αcont)
 
         pots.C_∇W[:] = pots.C_∇W - ∇pot
         pots.N_W[i] = pots.N_W[i] + sum(pot)
