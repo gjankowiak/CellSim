@@ -380,7 +380,8 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
 
     if F.DEBUG
         println("PRE alpha, beta, r, q, K, θ")
-        display([c.α c.β c.r c.q c.k c.θ])
+        # display([c.α c.β c.r c.q c.k c.θ])
+        display([sum(c.α)/P.Nnuc sum(c.β)/P.Nnuc sum(c.r)/P.Nnuc sum(c.q)/P.Nnuc sum(c.k)/P.Nnuc sum(c.θ)/P.Nnuc maximum(c.Y[:,1])])
         println()
     end
 
@@ -392,7 +393,8 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
 
     if F.DEBUG
         println("POST alpha, beta, r, q, K, θ")
-        display([new_c.α new_c.β new_c.r new_c.q new_c.k new_c.θ])
+        # display([new_c.α new_c.β new_c.r new_c.q new_c.k new_c.θ])
+        display([sum(new_c.α)/P.Nnuc sum(new_c.β)/P.Nnuc sum(new_c.r)/P.Nnuc sum(new_c.q)/P.Nnuc sum(new_c.k)/P.Nnuc sum(new_c.θ)/P.Nnuc maximum(new_c.Y[:,1])])
         println()
     end
 end
