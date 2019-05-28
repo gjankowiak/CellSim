@@ -145,12 +145,11 @@ function update_r(c::NucleusCoords, new_c::NucleusCoords,
     new_c.q[:] = 0.5*(new_c.r + new_c.r[new_c.circ_idx.p1])
 end
 
-function finite_differences_3(new_c::NucleusCoords,
+function finite_differences_3(c::NucleusCoords,
                               Dm2::Vector{Float64}, Dm1::Vector{Float64},
                               D0::Vector{Float64},
                               Dp1::Vector{Float64}, Dp2::Vector{Float64};
                               prefactor::Float64=1.0, dual::Bool=false)
-    c = new_c
     circ_idx = c.circ_idx
     if dual
         Dm2[:] = @. prefactor/ (c.q[circ_idx.m1] * c.q[circ_idx.m2] * c.r[circ_idx.m1])
@@ -223,15 +222,15 @@ function update_K(c::NucleusCoords, new_c::NucleusCoords,
            new_c.r./P.δt
            + 0.5*(new_c.α - new_c.α[circ_idx.m1])
            + 0.5*(W + W[circ_idx.m1]).*(1 ./new_c.q + 1 ./new_c.q[circ_idx.m1])
-           + c.r .* c.k .* c.β)
+           + new_c.r .* c.k .* c.β)
 
     f[:] = (
             new_c.r.*c.k/P.δt
-            - 0.5P.N_kb*(c.k[circ_idx.p1].^3 - c.k.^3)./c.q
-            + 0.5P.N_kb*(c.k.^3 - c.k[circ_idx.m1].^3)./c.q[circ_idx.m1]
-            + 0.5*vec( CSC.@dotprod(∇W[circ_idx.p1,:] + ∇W, c.n[circ_idx.p1,:]) ./ c.q
-                   -CSC.@dotprod(∇W + ∇W[circ_idx.m1,:], c.n) .* (1 ./c.q + 1 ./c.q[circ_idx.m1])
-                   +CSC.@dotprod(∇W[circ_idx.m1,:]+∇W[circ_idx.m2,:], c.n[circ_idx.m1,:]) ./ c.q[circ_idx.m1]
+            - 0.5P.N_kb*(c.k[circ_idx.p1].^3 - c.k.^3)./new_c.q
+            + 0.5P.N_kb*(c.k.^3 - c.k[circ_idx.m1].^3)./new_c.q[circ_idx.m1]
+            + 0.5*vec( CSC.@dotprod(∇W[circ_idx.p1,:] + ∇W, c.n[circ_idx.p1,:]) ./ new_c.q
+                   -CSC.@dotprod(∇W + ∇W[circ_idx.m1,:], new_c.n) .* (1 ./new_c.q + 1 ./new_c.q[circ_idx.m1])
+                   +CSC.@dotprod(∇W[circ_idx.m1,:]+∇W[circ_idx.m2,:], new_c.n[circ_idx.m1,:]) ./ new_c.q[circ_idx.m1]
                   )
            )
 
@@ -283,7 +282,7 @@ function update_θ(c::NucleusCoords, new_c::NucleusCoords,
 
     f[:] = (new_c.r.*c.θ/P.δt
             + diff_pow_3
-            + 0.5*vec(CSC.@dotprod(∇W, (c.n[circ_idx.p1,:] + c.n)) - CSC.@dotprod(∇W[circ_idx.m1,:], (c.n + c.n[circ_idx.m1,:])))
+            + 0.5*vec(CSC.@dotprod(∇W, (new_c.n[circ_idx.p1,:] + new_c.n)) - CSC.@dotprod(∇W[circ_idx.m1,:], (new_c.n + new_c.n[circ_idx.m1,:])))
            )
 
     # Periodic boundary conditions:
@@ -313,7 +312,7 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
 
     finite_differences_3(new_c, Dm2, Dm1, D0, Dp1, Dp2; prefactor=P.N_kb, dual=true)
 
-    Dm1[:] = Dm1 + 1.5P.N_kb*new_c.k.^2 ./new_c.r + 0.5new_c.α - W./new_c.r
+    Dm1[:] = Dm1 + 1.5P.N_kb*new_c.k.^2 ./new_c.r                           + 0.5new_c.α - W./new_c.r
     Dp1[:] = Dp1 + 1.5P.N_kb*new_c.k[circ_idx.p1].^2 ./new_c.r[circ_idx.p1] - 0.5new_c.α - W./new_c.r[circ_idx.p1]
 
     D0[:] = new_c.q/P.δt - (Dm2 + Dm1 + Dp1 + Dp2)
@@ -325,8 +324,8 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
          vec(new_c.q .* c.Y)/P.δt
          -0.5P.N_P*vec(new_c.r[circ_idx.p1].*n_p1 + new_c.r.*n)
          -0.5*vec(
-                c.r[circ_idx.p1] .* vec(CSC.@dotprod(c.n[circ_idx.p1,:], ∇W)) .* c.n[circ_idx.p1,:]
-               +c.r .* vec(CSC.@dotprod(c.n, ∇W)) .* c.n
+                new_c.r[circ_idx.p1] .* vec(CSC.@dotprod(new_c.n[circ_idx.p1,:], ∇W)) .* new_c.n[circ_idx.p1,:]
+               +new_c.r .* vec(CSC.@dotprod(new_c.n, ∇W)) .* new_c.n
               )
         )
 
