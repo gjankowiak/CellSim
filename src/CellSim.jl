@@ -176,6 +176,8 @@ function main()
         println("*** DEBUG MODE ***")
     end
 
+    run(`stty -icanon`)
+
     plotables = CSC.new_plotables(P.N)
 
     if haskey(yaml_config, "load_state")
@@ -268,27 +270,45 @@ function main()
         end
     end
 
-    fig = Plotting.init_plot(coords, P, F)
-    Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
-    if F.write_animation
-        writer = Plotting.init_animation(date_string)
-        writer[:setup](fig, string(writer[:metadata]["title"], ".mp4"), 100)
+    if F.plot
+        fig = Plotting.init_plot(coords, P, F)
+        Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
+        if F.write_animation
+            writer = Plotting.init_animation(date_string)
+            writer[:setup](fig, string(writer[:metadata]["title"], ".mp4"), 100)
+        end
     end
 
     k = 0
     prev_height = 0.0
+
+    stepping = F.DEBUG
+    if !stepping
+        input_task = @async read(stdin, Char)
+    end
 
     println("Initialized")
 
     # outer loop
     while k < P.M
 
-        if F.DEBUG
-            key = read(stdin, 1)
-            if key == "q"
+        if stepping
+            println("debug: 'q' to quit, 'c' to run continuously, any other key to step, 'b' to run step by step")
+            key = read(stdin, 1)[1]
+            if key == 0x63 # c
+                stepping = false
+                input_task = @async read(stdin, Char)
+            elseif key == 0x71 # q
                 break
             end
-
+        elseif istaskdone(input_task)
+            key = fetch(input_task)
+            if key == 'b'
+                stepping = true
+                input_task = @async read(stdin, Char)
+            elseif key == 'q'
+                break
+            end
         end
 
         k += 1
@@ -363,11 +383,10 @@ function main()
 
     end
 
-    if F.write_animation
+    if F.write_animation & F.plot
         writer[:finish]()
     end
-    println("Finished, type Enter to exit")
-    read(stdin, 1)
+    println("Finished")
 
     return
 end
