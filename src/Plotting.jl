@@ -195,17 +195,17 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
     if F.centrosome
         # Centrosome
         ## Orientation
-        # scatters[idx_s].set_offsets(coords.centro_x) # centrosome
-        # scatters[idx_s].set_UVC([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
-        # idx_s += 1
+        scatters[idx_s].set_offsets(coords.centro_x) # centrosome
+        scatters[idx_s].set_UVC([cos.(coords.centro_angle)], [sin.(coords.centro_angle)])
+        idx_s += 1
 
         ## Visibility
         patches[idx_p].set_xy(vr.nodes[1:vr.n,:] .+ reshape(coords.centro_x, 1, 2))
         idx_p += 1
 
         ## Center
-        # artists[idx_a].center = (coords.centro_x[1], coords.centro_x[2])
-        # idx_a += 1
+        artists[idx_a].center = (coords.centro_x[1], coords.centro_x[2])
+        idx_a += 1
 
         ## Microtubule force
         # scatters[idx_s].set_offsets(coords.centro_x) # centrosome
