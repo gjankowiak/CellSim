@@ -205,7 +205,6 @@ function assemble_system(P::CSC.Params, F::CSC.Flags,
                          coords::PointCoords, bufs::Visibility.Buffers, vr::VisibleRegion,
                          qw::QuadratureWeights, pc::PolarCoordinates, plotables::CSC.Plotables,
                          potentials::CSC.InteractionPotentials)
-    compute_vr(P, coords, bufs, vr)
     compute_angles_radii(vr, pc)
     compute_line_coefficients(pc, qw)
     compute_quadrature_weights(vr, qw)

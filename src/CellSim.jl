@@ -257,6 +257,7 @@ function main()
 
     # centrosome buffers and coordinates
     (centro_bufs, centro_vr, centro_qw, centro_pc) = Centrosome.init(P)
+    Centrosome.compute_vr(P, coords, centro_bufs, centro_vr)
     (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, F, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables, potentials)
 
     resi, resi_J = Cortex.wrap_residuals(coords, coords_s, potentials, P, F, plotables)
@@ -277,7 +278,7 @@ function main()
         Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
         if F.write_animation
             writer = Plotting.init_animation(date_string)
-            writer[:setup](fig, string(writer[:metadata]["title"], ".mp4"), 100)
+            writer.setup(fig, string(writer.metadata["title"], ".mp4"), 100)
         end
     end
 
@@ -307,10 +308,10 @@ function main()
             key = fetch(input_task)
             if key == 'b'
                 stepping = true
-                input_task = @async read(stdin, Char)
             elseif key == 'q'
                 break
             end
+            input_task = @async read(stdin, Char)
         end
 
         k += 1
@@ -354,6 +355,7 @@ function main()
 
             coords.centro_x .+= δx[(2P.N+1):(2P.N+2)]
             coords.centro_angle .+= δx[2P.N+3]
+            Centrosome.compute_vr(P, coords, centro_bufs, centro_vr)
         else
             δx[:] = -Jr_x\r_x
             x .+= + reshape(δx, P.N, 2)
@@ -364,7 +366,7 @@ function main()
         if (F.plot & (k % plot_period == 0))
             Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
-                writer[:grab_frame]()
+                writer.grab_frame()
             end
             height = sum(x[:,2]/P.N)
             long_speed = (height - prev_height) / (plot_period*P.δt)
@@ -386,7 +388,7 @@ function main()
     end
 
     if F.write_animation & F.plot
-        writer[:finish]()
+        writer.finish()
     end
     println("Finished")
 
