@@ -181,7 +181,6 @@ function compute_mt_longi_force(vr::VisibleRegion, P::CSC.Params, plotables::CSC
     p = P.MT_potential_power
     k = P.MT_factor
     plotables.mt_force_indiv[1:vr.n,:] = -k*vr.nodes[1:vr.n,:].*abs.(CSC.@entry_norm(vr.nodes[1:vr.n,:])).^p
-    plotables.mt_force_indiv[1:vr.n,:] = plotables.mt_force_indiv[1:vr.n,:]/P.N
 end
 
 function integrate_θ(f::Array{Float64}, qw::QuadratureWeights, vr::VisibleRegion)
