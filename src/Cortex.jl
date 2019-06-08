@@ -493,13 +493,9 @@ end
 function compute_density_increment(coords::PointCoords, coords_s::PointCoordsShifted,
                                    P::Params, F::Flags, plt::CSC.Plotables)
     """
-    de/polymerization is located around the back/frontmost points, with a weight of (a, 1-2a, a)
+    de/polymerization is located around the back/frontmost points
     the total flux J = ∫(f)+ dl is fixed by the polymerization speed
     """
-    a = 0.25
-
-    ((x_min, x_min_idx), (x_max, x_max_idx)) = compute_front_back(coords, P, F)
-
     # computation of the density increment
     ΔLc = 0.5*(coords.ΔL .+ coords_s.ΔL_m)
 
@@ -548,6 +544,9 @@ function split_cumsum(a::Array{Float64,1}, idx)
 end
 
 function compute_mask(coords::PointCoords, P::Params, F::Flags, half_w::Float64, pow::Float64=2.0)
+    """
+    return pmi = profile_min and pma = profile_max such that Σpmi = Σpma = 0.5
+    """
     ((x_min, x_min_idx), (x_max, x_max_idx)) = compute_front_back(coords, P, F)
 
     dst_from_min = split_cumsum(coords.ΔL, x_min_idx)
@@ -571,11 +570,11 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
     compute_density_increment(coords, coords_s, P, F, plt)
 
     # computation of the transport term
-    # plt.mass_source_int[:] = cumsum_zero(P.Δσ*plt.mass_source)
     plt.mass_source_int[:] = cumsum(P.Δσ*plt.mass_source)
+
+    # averaging
     plt.mass_source_int[:] = 0.5(plt.mass_source_int .+ plt.mass_source_int[coords.circ_idx.m1])
 
-    plt.transport_force[:] = (0.5sum(max.(0.0, P.Δσ*plt.mass_source)).-plt.mass_source_int).*coords.Δ2x/2P.Δσ
     plt.transport_force[:] = (-plt.mass_source_int).*coords.Δ2x/2P.Δσ
 
     drag_mask_f, drag_mask_b = compute_mask(coords, P, F, P.drag_gauss_width, P.drag_gauss_power)
@@ -583,7 +582,6 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
 
     # caution, the centered difference operator is not skewsymmetric
     plt.drag_force[:] = drag_mask.*sum(plt.mass_source_int .* coords.Δ2x/2P.Δσ; dims=1)
-    # plt.drag_force[:] = drag_mask.*sum(plt.mass_source_int .* coords.Δx/P.Δσ; dims=1)
 
     if add
         copyto!(dst_f, dst_f .+ vec(plt.transport_force .+ plt.drag_force))
@@ -599,9 +597,6 @@ function compute_transport_force(coords::PointCoords, coords_s::PointCoordsShift
                                  add::Bool=false)
 
     D_transport_force = CSC.@bc_scalar(0.5sum(max.(0.0, P.Δσ*plt.mass_source)).-plt.mass_source_int) .* D1c
-    # D_transport_force = CSC.@bc_scalar(0.5sum(max.(0.0, P.Δσ*plt.mass_source)).-plt.mass_source_int) .* D1p
-    # D_transport_force = 0*CSC.@bc_scalar(P.Δσ*sum(plt.mass_source_int).-plt.mass_source_int) .* D1c
-    # D_transport_force = CSC.@bc_scalar(P.Δσ*sum(plt.mass_source_int).-plt.mass_source_int) .* D1p
 
     if add
         dst_Df[:] = dst_Df .+ D_transport_force
@@ -620,7 +615,6 @@ function compute_viscosity_force(coords::PointCoords, coords_s::PointCoordsShift
 
     dst[:] = P.Ka * (1/params.δt * ((vd2τ .- vd2τ_prev) .* dvΔL .+ (d1vd2τ .- d1vd2τ_prev) .* (2params.Δσ*coords.vc)./coords.Δ2L)
                      .+ !F.initializing * trsp_dir .* (2P.Δσ*d2vd2τ.*coords.vc./coords.Δ2L .+ d1vd2τ.*dvΔL))
-    # dst_Df[:] =
 end
 
 function compute_residuals(x::Vector{Float64},

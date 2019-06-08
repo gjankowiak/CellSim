@@ -42,7 +42,7 @@ struct Params
     P::Float64    # pressure
     K::Float64    # membrane elasticity
     Ka::Float64   # cortex viscosity
-    c::Float64    # polymerization speed
+    c::Float64    # polymerization mass transfer speed
 
     # Initial condition parameters
     x0_a::Float64      # initial ellipsis width
