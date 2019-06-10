@@ -221,7 +221,7 @@ function main()
     if haskey(yaml_config, "load_state") && load_state["do_load"] && load_state["init_centro"]
         # if the initial centrosome location is given in the config, load it
         # the centrosome angle doesn't have any impact at this point
-        coords.centro_x[:] = readcsv(load_state["filename_centro"])
+        coords.centro_x[:] = readdlm(load_state["filename_centro"], ',')
     else
         # otherwise, pick the centrosome location as the initial center of mass
         coords.centro_x[:] = sum(x_init; dims=1)/size(x_init,1)
@@ -233,10 +233,12 @@ function main()
         old_nucleus_coords = Nucleus.initialize_coords(P, F, coords)
         nucleus_coords = Nucleus.initialize_coords(P, F, coords)
         #
-        # DEBUG
-        # Y - sum(Y)/n + [0.0, 0.18]
-        old_nucleus_coords.Y[:] = old_nucleus_coords.Y .- sum(old_nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 0.18]
-        nucleus_coords.Y[:] = nucleus_coords.Y .- sum(nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 0.18]
+        # shift nucleus to a wide section
+        #
+        if haskey(yaml_config, "load_state") && haskey(load_state, "shift_nucleus")
+            old_nucleus_coords.Y[:] = old_nucleus_coords.Y .- sum(old_nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 load_state["shift_nucleus"]]
+            nucleus_coords.Y[:] = nucleus_coords.Y .- sum(nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 load_state["shift_nucleus"]]
+        end
 
         temparrays = CSC.TempArrays6(
                                      zeros(P.Nnuc),
@@ -375,8 +377,8 @@ function main()
             # println("Long. speed: ", long_speed)
         end
 
-        writedlm(".last_x.csv", coords.x, ',')
-        writedlm(".last_centro_x.csv", coords.centro_x', ',')
+        writedlm("runs/Run_$(date_string)_last_x.csv", coords.x, ',')
+        writedlm("runs/Run_$(date_string)_last_centro_x.csv", coords.centro_x, ',')
 
         l2_norm = sqrt(sum(abs2, x))
 
