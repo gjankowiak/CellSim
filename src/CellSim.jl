@@ -123,6 +123,8 @@ function main()
         y_params["MT_factor"],
         y_params["Nnuc"],
         y_params["N_P"],
+        y_params["N_mu"],
+        y_params["N_target_area"],
         y_params["N_kb"],
         y_params["N_ω"],
         y_params["N_W0"],

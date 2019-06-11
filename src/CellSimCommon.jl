@@ -76,6 +76,8 @@ struct Params
     # Nucleus related parameters
     Nnuc::Int64   # number of points on the nucleus
     N_P::Float64  # pressure
+    N_mu::Float64 # area constraint relaxation constant
+    N_target_area::Float64 # target area
     N_kb::Float64 # bending stiffness
     N_ω::Float64  # inplane stiffness
     N_W0::Float64  # potential offset

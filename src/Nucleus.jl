@@ -115,11 +115,14 @@ function update_alphabeta(c::NucleusCoords, new_c::NucleusCoords,
 
     c.L = sum(c.r)
 
+    area = 0.25*sum(c.q.*(CSC.@dotprod(c.n, c.Y) + CSC.@dotprod(c.n[circ_idx.p1,:], c.Y)))
+    PA = -P.N_mu*(area-P.N_target_area)
+
     c.β[:] = (
               P.N_kb./c.r .*( (c.k[circ_idx.p1] - c.k)./c.q
                              -(c.k - c.k[circ_idx.m1])./c.q[circ_idx.m1])
               + 0.5P.N_kb*c.k.^3
-              .- P.N_P
+              .- (P.N_P - PA)
               - 0.5*(W+W[circ_idx.m1]).*c.k
               - 0.5vec(sum(c.n.*(∇W+∇W[circ_idx.m1,:]); dims=2))
              )
@@ -320,9 +323,12 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
     n = new_c.n
     n_p1 = circshift(n, -1)
 
+    area = 0.25*sum(c.q.*(CSC.@dotprod(c.n, c.Y) + CSC.@dotprod(c.n[circ_idx.p1,:], c.Y)))
+    PA = -P.N_mu*(area-P.N_target_area)
+
     f = (
          vec(new_c.q .* c.Y)/P.δt
-         -0.5P.N_P*vec(new_c.r[circ_idx.p1].*n_p1 + new_c.r.*n)
+         -0.5(P.N_P - PA)*vec(new_c.r[circ_idx.p1].*n_p1 + new_c.r.*n)
          -0.5*vec(
                 new_c.r[circ_idx.p1] .* vec(CSC.@dotprod(new_c.n[circ_idx.p1,:], ∇W)) .* new_c.n[circ_idx.p1,:]
                +new_c.r .* vec(CSC.@dotprod(new_c.n, ∇W)) .* new_c.n
