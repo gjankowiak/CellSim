@@ -79,12 +79,19 @@ function main()
     date_string = string(Dates.now())
 
     yaml_config = YAML.load(open(config_filename))
+    y_params = yaml_config["params"]
+
+    output_prefix = "runs/"
+
+    if haskey(yaml_config, "output_prefix")
+        output_prefix = yaml_config["output_prefix"]
+    end
 
     run(`mkdir -p runs`)
     run(`mkdir -p dumps`)
-    run(`cp $config_filename runs/Run_$date_string.yaml`)
+    run(`mkdir -p $(output_prefix)`)
+    run(`cp $config_filename $(output_prefix)Run_$date_string.yaml`)
 
-    y_params = yaml_config["params"]
 
     # Parameters
     P = CSC.Params(
@@ -287,6 +294,8 @@ function main()
     k = 0
     prev_height = 0.0
 
+    metrics = Dict{String, Float64}()
+
     stepping = F.DEBUG
     if !stepping
         input_task = @async read(stdin, Char)
@@ -319,6 +328,14 @@ function main()
         k += 1
         print("\b"^100)
         println(" iteration #", k, ", ")
+
+        # initialization metrics
+        if k == 400
+            metrics["t_start"] = k*P.δt
+            barycenter_y = sum(x[:,2])/P.N
+            metrics["barycenter_y_start"] = barycenter_y
+        end
+
 
         # inner loop
         if k > 1
@@ -377,8 +394,8 @@ function main()
             # println("Long. speed: ", long_speed)
         end
 
-        writedlm("runs/Run_$(date_string)_last_x.csv", coords.x, ',')
-        writedlm("runs/Run_$(date_string)_last_centro_x.csv", coords.centro_x, ',')
+        writedlm("$(output_prefix)Run_$(date_string)_last_x.csv", coords.x, ',')
+        writedlm("$(output_prefix)Run_$(date_string)_last_centro_x.csv", coords.centro_x, ',')
 
         l2_norm = sqrt(sum(abs2, x))
 
@@ -389,6 +406,15 @@ function main()
 
 
     end
+
+    metrics["t_end"] = k*P.δt
+    barycenter_y = sum(x[:,2])/P.N
+    metrics["barycenter_y_end"] = barycenter_y
+    metrics["speed"] = (metrics["barycenter_y_end"] - metrics["barycenter_y_start"])/(metrics["t_end"] - metrics["t_start"])
+    metrics["fw0"] = P.f_ω0
+    metrics["fb"] = P.f_β
+    metrics["fwidth"] = P.f_width
+    JankoUtils.write_dict("$(output_prefix)Run_$(date_string)_metrics.yaml", metrics)
 
     if F.write_animation & F.plot
         writer.finish()
