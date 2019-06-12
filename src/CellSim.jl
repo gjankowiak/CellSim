@@ -85,6 +85,9 @@ function main()
 
     if haskey(yaml_config, "output_prefix")
         output_prefix = yaml_config["output_prefix"]
+        if !endswith("output_prefix", "/")
+            output_prefix = output_prefix * "/"
+        end
     end
 
     run(`mkdir -p runs`)
@@ -92,47 +95,46 @@ function main()
     run(`mkdir -p $(output_prefix)`)
     run(`cp $config_filename $(output_prefix)Run_$date_string.yaml`)
 
-
     # Parameters
     P = CSC.Params(
-        y_params["M"],
-        1/y_params["N"], # Δσ
-        y_params["δt"],
+        @eval_if_string(y_params["M"]),
+        1/@eval_if_string(y_params["N"]), # Δσ
+        @eval_if_string(y_params["δt"]),
         @eval_if_string(y_params["N"]),
         @eval_if_string(y_params["P"]),
         @eval_if_string(y_params["K"]),
         @eval_if_string(y_params["Ka"]),
         @eval_if_string(y_params["c"]),
-        y_params["x0_a"],
-        y_params["x0_b"],
-        y_params["x0_shift"],
-        y_params["f_α"],
-        y_params["f_β"],
+        @eval_if_string(y_params["x0_a"]),
+        @eval_if_string(y_params["x0_b"]),
+        @eval_if_string(y_params["x0_shift"]),
+        @eval_if_string(y_params["f_α"]),
+        @eval_if_string(y_params["f_β"]),
         @eval_if_string(y_params["f_ω0"]),
-        y_params["f_σ"],
-        y_params["f_nk"],
-        y_params["f_width"],
-        y_params["f_iwidth"],
-        y_params["drag_gauss_power"],
-        y_params["drag_gauss_width"],
-        y_params["mass_gauss_power"],
-        y_params["mass_gauss_width"],
-        y_params["polar_shift"],
-        y_params["k_MT"],
-        y_params["MT_potential_power"],
-        y_params["MT_factor"],
-        y_params["Nnuc"],
-        y_params["N_P"],
-        y_params["N_mu"],
-        y_params["N_target_area"],
-        y_params["N_kb"],
-        y_params["N_ω"],
-        y_params["N_W0"],
-        y_params["N_kcont"],
-        y_params["N_αcont"],
-        y_params["N_kc"],
-        y_params["N_l0c"],
-        y_params["N_r_init"]
+        @eval_if_string(y_params["f_σ"]),
+        @eval_if_string(y_params["f_nk"]),
+        @eval_if_string(y_params["f_width"]),
+        @eval_if_string(y_params["f_iwidth"]),
+        @eval_if_string(y_params["drag_gauss_power"]),
+        @eval_if_string(y_params["drag_gauss_width"]),
+        @eval_if_string(y_params["mass_gauss_power"]),
+        @eval_if_string(y_params["mass_gauss_width"]),
+        @eval_if_string(y_params["polar_shift"]),
+        @eval_if_string(y_params["k_MT"]),
+        @eval_if_string(y_params["MT_potential_power"]),
+        @eval_if_string(y_params["MT_factor"]),
+        @eval_if_string(y_params["Nnuc"]),
+        @eval_if_string(y_params["N_P"]),
+        @eval_if_string(y_params["N_mu"]),
+        @eval_if_string(y_params["N_target_area"]),
+        @eval_if_string(y_params["N_kb"]),
+        @eval_if_string(y_params["N_ω"]),
+        @eval_if_string(y_params["N_W0"]),
+        @eval_if_string(y_params["N_kcont"]),
+        @eval_if_string(y_params["N_αcont"]),
+        @eval_if_string(y_params["N_kc"]),
+        @eval_if_string(y_params["N_l0c"]),
+        @eval_if_string(y_params["N_r_init"])
    )
 
     println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
@@ -218,6 +220,7 @@ function main()
             end
         else
             x_init = EvenParam.reparam(compute_initial_x(P, F; convex=true))
+            x_init[:,2] .+= P.x0_shift
         end
     end
 

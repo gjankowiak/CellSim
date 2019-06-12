@@ -74,6 +74,7 @@ function compute_contact_force(pots::CSC.InteractionPotentials,
                                cor_coords::PointCoords, c::NucleusCoords,
                                P::Params, F::Flags)
 
+    # FIXME this needs to be normalized!
     if P.N_kcont > 0
         for i in 1:P.Nnuc
             xy = cor_coords.x .- c.Y[i,:]'
@@ -370,8 +371,6 @@ function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords)
         2π*P.N_r_init, # L
         CSC.init_circ_idx(P.Nnuc) # circ_idx
        )
-
-    nc.Y[:] = nc.Y .+ bc
 
     return nc
 end
