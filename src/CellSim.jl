@@ -199,13 +199,7 @@ function main()
             x_init = readdlm(load_state["filename"], ',')
             if load_state["do_recenter"]
                 x_init .-= sum(x_init; dims=1)/size(x_init, 1)
-                #x_init[:,1] *= P.x0_a/abs(maximum(x_init[:,1]))
-                #x_init[:,2] *= P.x0_b/abs(maximum(x_init[:,2]))
             end
-
-            # if F.circular_wall
-            # x_init[:,1] += P.polar_shift
-            # end
 
             if load_state["do_resample"]
                 x_init = EvenParam.reparam(x_init; closed=true, new_N=P.N)
