@@ -7,6 +7,8 @@ params:
     P: 4*6.15e-1 # pressure
     K: 2*5e-2 # membrane elasticity
     Ka: 1 # cortex viscosity
+    mu: 10 # area constraint relaxation constant
+    target_area: 1 # cortex target area
 
     c: 1e1 # polymerization speed
 
