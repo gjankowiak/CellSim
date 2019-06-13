@@ -71,6 +71,7 @@ flags:
     centrosome:           true
     nucleus:              true
     follow_cam:           false
+    force_cortex_area:    true
     debug:                false
 
 load_state:
