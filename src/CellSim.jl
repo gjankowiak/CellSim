@@ -100,14 +100,22 @@ function main()
         @eval_if_string(y_params["M"]),
         1/@eval_if_string(y_params["N"]), # Δσ
         @eval_if_string(y_params["δt"]),
+
+        # Cortex related parameters
         @eval_if_string(y_params["N"]),
         @eval_if_string(y_params["P"]),
         @eval_if_string(y_params["K"]),
         @eval_if_string(y_params["Ka"]),
         @eval_if_string(y_params["c"]),
+        @eval_if_string(y_params["mu"]),
+        @eval_if_string(y_params["target_area"]),
+
+        # Initial condition parameters
         @eval_if_string(y_params["x0_a"]),
         @eval_if_string(y_params["x0_b"]),
         @eval_if_string(y_params["x0_shift"]),
+
+        # Confinement field
         @eval_if_string(y_params["f_α"]),
         @eval_if_string(y_params["f_β"]),
         @eval_if_string(y_params["f_ω0"]),
@@ -115,14 +123,21 @@ function main()
         @eval_if_string(y_params["f_nk"]),
         @eval_if_string(y_params["f_width"]),
         @eval_if_string(y_params["f_iwidth"]),
+
         @eval_if_string(y_params["drag_gauss_power"]),
         @eval_if_string(y_params["drag_gauss_width"]),
+
         @eval_if_string(y_params["mass_gauss_power"]),
         @eval_if_string(y_params["mass_gauss_width"]),
+
         @eval_if_string(y_params["polar_shift"]),
+
+        # Centrosome related parameters
         @eval_if_string(y_params["k_MT"]),
         @eval_if_string(y_params["MT_potential_power"]),
         @eval_if_string(y_params["MT_factor"]),
+
+        # Nucleus related parameters
         @eval_if_string(y_params["Nnuc"]),
         @eval_if_string(y_params["N_P"]),
         @eval_if_string(y_params["N_mu"]),
@@ -154,6 +169,7 @@ function main()
           y_flags["centrosome"],
           y_flags["nucleus"],
           y_flags["weighted_confinement"],
+          y_flags["force_cortex_area"],
 
           # scheme/solver options
           y_flags["innerloop"],
@@ -285,7 +301,7 @@ function main()
         fig = Plotting.init_plot(coords, P, F)
         Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
         if F.write_animation
-            writer = Plotting.init_animation(date_string)
+            writer = Plotting.init_animation(output_prefix, date_string)
             writer.setup(fig, string(writer.metadata["title"], ".mp4"), 100)
         end
     end

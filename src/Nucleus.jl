@@ -102,7 +102,7 @@ function compute_centronuclear_force(pots::CSC.InteractionPotentials,
         d = sqrt.(sum(abs2, Yc; dims=2))
         Yc_norm = Yc ./ d
 
-        pots.CS_∇W[:] = pots.CS_∇W + sum(P.N_kc * (d .- P.N_l0c) .* Yc_norm; dims=1)
+        pots.CS_∇W[:] = -sum(P.N_kc * (d .- P.N_l0c) .* Yc_norm; dims=1)
 
         pots.N_W[:] = pots.N_W + 0.5*P.N_kc/P.Nnuc*(d .- P.N_l0c).^2
         pots.N_∇W[:] = pots.N_∇W - repeat(pots.CS_∇W, P.Nnuc)/P.Nnuc

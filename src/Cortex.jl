@@ -355,7 +355,8 @@ function compute_front_back(coords::PointCoords, P::Params, F::Flags)
     return ((x_back, x_back_idx), (x_front, x_front_idx))
 end
 
-function compute_pressure_force(coords::PointCoords, P::Params,
+function compute_pressure_force(coords::PointCoords, coords_s::PointCoordsShifted,
+                                P::Params,
                                 dst_f::Vector{Float64},
                                 add::Bool=false)
 
@@ -367,13 +368,19 @@ function compute_pressure_force(coords::PointCoords, P::Params,
         close(w)
     end
 
+    # area constraint
+    area = 0.25*sum(coords.ΔL .* CSC.@dotprod(coords.v, coords.x) + coords_s.ΔL_p .* CSC.@dotprod(coords_s.v_p, coords.x))
+    PA = -P.mu*(area-P.target_area)
+
     if add
-        copyto!(dst_f, dst_f .- P.P*D1c_perp*vec(coords.x))
+        copyto!(dst_f, dst_f .- (P.P + PA)*D1c_perp*vec(coords.x))
     else
-        copyto!(dst_f, -P.P*D1c_perp*vec(coords.x))
+        copyto!(dst_f, -(P.P + PA)*D1c_perp*vec(coords.x))
     end
 end
-function compute_pressure_force(coords::PointCoords, P::Params,
+function compute_pressure_force(coords::PointCoords,
+                                coords_s::PointCoordsShifted,
+                                P::Params,
                                 dst_Df::SA.SparseMatrixCSC{Float64},
                                 add::Bool=false)
 
@@ -385,11 +392,15 @@ function compute_pressure_force(coords::PointCoords, P::Params,
         close(w)
     end
 
+    # area constraint
+    area = 0.25*sum(coords.ΔL .* CSC.@dotprod(coords.v, coords.x) + coords_s.ΔL_p .* CSC.@dotprod(coords_s.v_p, coords.x))
+    PA = -P.mu*(area-P.target_area)
+
 
     if add
-        dst_Df[:] = dst_Df .- P.P*D1c_perp
+        dst_Df[:] = dst_Df .- (P.P + PA)*D1c_perp
     else
-        dst_Df[:] = -P.P*D1c_perp
+        dst_Df[:] = -(P.P + PA)*D1c_perp
     end
 end
 
@@ -633,7 +644,7 @@ function compute_residuals(x::Vector{Float64},
 
     fill!(dst, 0.0)
 
-    compute_pressure_force(inner_coords, P, dst, true)
+    compute_pressure_force(inner_coords, inner_coords_s, P, dst, true)
     compute_elastic_force(inner_coords, inner_coords_s, P, differentials, dst, true)
     if F.confine
         compute_confinement_force(inner_coords, P, F, plotables, dst, true, F.weighted_confinement)
@@ -668,7 +679,7 @@ function compute_residuals_J(x::Vector{Float64},
         empty!(dst_Df.rowval)
         empty!(dst_Df.nzval)
     end
-    compute_pressure_force(inner_coords, P, dst_Df, true)
+    compute_pressure_force(inner_coords, inner_coords_s, P, dst_Df, true)
     compute_elastic_force(inner_coords, inner_coords_s,
                           P, differentials, dst_Df, true)
     if F.confine

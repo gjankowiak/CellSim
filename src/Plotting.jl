@@ -257,9 +257,9 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
     sleep(0.001)
 end
 
-function init_animation(date_string::String)
+function init_animation(prefix::String, date_string::String)
     FFMpegWriter = animation.FFMpegWriter
-    metadata = Dict((:title => string("runs/Run_", date_string), :artist => "GJ"))
+    metadata = Dict((:title => string(prefix, "Run_", date_string), :artist => "GJ"))
     writer = FFMpegWriter(fps=15, metadata=metadata)
     return writer
 end

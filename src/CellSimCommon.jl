@@ -43,6 +43,8 @@ struct Params
     K::Float64    # membrane elasticity
     Ka::Float64   # cortex viscosity
     c::Float64    # polymerization mass transfer speed
+    mu::Float64   # area constraint relaxation constant
+    target_area::Float64 # cortex target area
 
     # Initial condition parameters
     x0_a::Float64      # initial ellipsis width
@@ -77,7 +79,7 @@ struct Params
     Nnuc::Int64   # number of points on the nucleus
     N_P::Float64  # pressure
     N_mu::Float64 # area constraint relaxation constant
-    N_target_area::Float64 # target area
+    N_target_area::Float64 # nucleus target area
     N_kb::Float64 # bending stiffness
     N_ω::Float64  # inplane stiffness
     N_W0::Float64  # potential offset
@@ -99,6 +101,7 @@ struct Flags
     centrosome::Bool
     nucleus::Bool
     weighted_confinement::Bool
+    force_cortex_area::Bool
 
     # scheme/solver options
     innerloop::Bool
