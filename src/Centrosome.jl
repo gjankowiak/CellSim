@@ -257,7 +257,8 @@ function assemble_system(P::CSC.Params, F::CSC.Flags,
     b_co_n[1:P.N] += -P.k_MT*(vr.M_inter'*(qw.A1[1:vr_n].*(vr.M_inter*plotables.transport_force[1:P.N])))
     b_co_n[(P.N+1):2P.N] += -P.k_MT*(vr.M_inter'*(qw.A1[1:vr_n].*(vr.M_inter*plotables.transport_force[(P.N+1):2P.N])))
 
-    id_comp = -P.k_MT/P.δt * SA.spdiagm(0 => repeat(vr.M_inter'*(qw.A1[1:vr_n].*(vr.M_inter*ones(P.N))), 2))
+    # FIXME : why δt ?
+    id_comp = -P.k_MT*SA.spdiagm(0 => repeat(vr.M_inter'*(qw.A1[1:vr_n].*(vr.M_inter*ones(P.N))), 2))
 
     return A, id_comp, b_ce, b_ce_n, b_co_n
 end
