@@ -31,7 +31,7 @@ function init_circ_idx(N::Int64)
              circshift(1:N, -1), circshift(1:N, -2))
 end
 
-struct Params
+mutable struct Params
     M::Int64      # max. number of iterations
 
     Δσ::Float64   # space step
@@ -90,7 +90,7 @@ struct Params
     N_r_init::Float64 # initial nucleus radius
 end
 
-struct Flags
+mutable struct Flags
     # model options
     confine::Bool
     adjust_drag::Bool
@@ -116,6 +116,7 @@ struct Flags
     # output options
     dryrun::Bool
     write_animation::Bool
+    write_metrics::Bool
 
     # debug
     DEBUG::Bool

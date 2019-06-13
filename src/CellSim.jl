@@ -42,29 +42,14 @@ function compute_initial_x(P::CSC.Params, F::CSC.Flags; convex::Bool=true)
             return 0.5 * Float64[P.x0_a*cospi.(2t) .+ 2P.polar_shift P.x0_b*sinpi.(2t)]
         end
     end
-
-    cx, cy = 0.6, 0.9
-    xr = 0.24
-    xl = 1-xr
-    yr, yl = 0.25, 0.75
-    pow = 2.0
-    px, py = 1600, 600
-
-    circ_x = cospi.(2t)
-    bump_up = cx*exp.(-px*(t-xr).^pow)-cx*exp.(-px*(t-(0.5-xr)).^pow)
-    bump_down =  cx*exp.(-px*(t-xl).^pow)-cx*exp.(-px*(t-(1.5-xl)).^pow)
-
-    x = P.x0_a*(circ_x+bump_up+bump_down)
-    y =  P.x0_b*(sinpi.(2t)-cy*exp.(-py*(t-yr).^pow)+cy*exp.(-py*(t-yl).^pow))
-
-    if !F.circular_wall
-        return Float64[x y]
-    else
-        return Float64[x+P.polar_shift y]
-    end
 end
 
 function main()
+    P, F, config = read_config()
+    launch(P, F, config)
+end
+
+function read_config()
     # initialization
 
     config_filename = "configs/default.yaml"
@@ -80,20 +65,6 @@ function main()
 
     yaml_config = YAML.load(open(config_filename))
     y_params = yaml_config["params"]
-
-    output_prefix = "runs/"
-
-    if haskey(yaml_config, "output_prefix")
-        output_prefix = yaml_config["output_prefix"]
-        if !endswith("output_prefix", "/")
-            output_prefix = output_prefix * "/"
-        end
-    end
-
-    run(`mkdir -p runs`)
-    run(`mkdir -p dumps`)
-    run(`mkdir -p $(output_prefix)`)
-    run(`cp $config_filename $(output_prefix)Run_$date_string.yaml`)
 
     # Parameters
     P = CSC.Params(
@@ -152,9 +123,6 @@ function main()
         @eval_if_string(y_params["N_r_init"])
    )
 
-    println("equilibrium radius: ", 1/(2*pi - P.P/P.K))
-    println("critical pressure: ", 2*pi*P.K)
-
     y_flags = yaml_config["flags"]
 
     # Flags
@@ -184,11 +152,33 @@ function main()
           # output options
           y_flags["dryrun"],
           y_flags["write_animation"],
+          y_flags["write_metrics"],
 
           # debug
           y_flags["debug"]
     )
 
+    config = yaml_config["config"]
+    config["config_filename"] = config_filename
+    config["date_string"] = date_string
+
+    if haskey(config, "output_prefix")
+        if !endswith(config["output_prefix"], "/")
+            config["output_prefix"] = config["output_prefix"] * "/"
+        end
+    else
+        config["output_prefix"] = "runs/"
+    end
+
+    launch(P, F, config)
+end
+
+function launch(P::CSC.Params, F::CSC.Flags, config)
+
+    run(`mkdir -p runs`)
+    run(`mkdir -p dumps`)
+    run(`mkdir -p $(config["output_prefix"])`)
+    run(`cp $(config["config_filename"]) $(config["output_prefix"])Run_$(config["date_string"]).yaml`)
     println("Parameters:")
     for s in fieldnames(typeof(P))
         println(string("    ", s, ": ", getfield(P, s)))
@@ -209,13 +199,10 @@ function main()
 
     plotables = CSC.new_plotables(P.N)
 
-    if haskey(yaml_config, "load_state")
-        load_state = yaml_config["load_state"]
-        if yaml_config["load_state"]["do_load"]
+    if haskey(config, "load_state")
+        load_state = config["load_state"]
+        if config["load_state"]["do_load"]
             x_init = readdlm(load_state["filename"], ',')
-            if load_state["do_recenter"]
-                x_init .-= sum(x_init; dims=1)/size(x_init, 1)
-            end
 
             if load_state["do_resample"]
                 x_init = EvenParam.reparam(x_init; closed=true, new_N=P.N)
@@ -240,7 +227,7 @@ function main()
     Cortex.init_FD_matrices(P)
     coords, coords_s = Cortex.new_PointCoords(x, P)
 
-    if haskey(yaml_config, "load_state") && load_state["do_load"] && load_state["init_centro"]
+    if haskey(config, "load_state") && load_state["do_load"] && load_state["init_centro"]
         # if the initial centrosome location is given in the config, load it
         # the centrosome angle doesn't have any impact at this point
         coords.centro_x[:] = readdlm(load_state["filename_centro"], ',')
@@ -257,7 +244,7 @@ function main()
         #
         # shift nucleus to a wide section
         #
-        if haskey(yaml_config, "load_state") && haskey(load_state, "shift_nucleus")
+        if haskey(config, "load_state") && haskey(load_state, "shift_nucleus")
             old_nucleus_coords.Y[:] = old_nucleus_coords.Y .- sum(old_nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 load_state["shift_nucleus"]]
             nucleus_coords.Y[:] = nucleus_coords.Y .- sum(nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 load_state["shift_nucleus"]]
         end
@@ -301,7 +288,7 @@ function main()
         fig = Plotting.init_plot(coords, P, F)
         Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
         if F.write_animation
-            writer = Plotting.init_animation(output_prefix, date_string)
+            writer = Plotting.init_animation(config["output_prefix"], config["date_string"])
             writer.setup(fig, string(writer.metadata["title"], ".mp4"), 100)
         end
     end
@@ -345,13 +332,16 @@ function main()
         println(" iteration #", k, ", ")
 
         # initialization metrics
-        if k == 400
-            metrics["t_start"] = k*P.δt
-            barycenter_y = sum(x[:,2])/P.N
-            metrics["barycenter_y_start"] = barycenter_y
+        if F.write_metrics
+            if k == config["metrics"]["start_iteration"]
+                metrics["t_start"] = k*P.δt
+                barycenter_y = sum(x[:,2])/P.N
+                metrics["barycenter_y_start"] = barycenter_y
+            end
         end
 
 
+        try
         # inner loop
         if k > 1
             Cortex.update_coords(coords, P, x)
@@ -395,6 +385,9 @@ function main()
             δx[:] = -Jr_x\r_x
             x .+= + reshape(δx, P.N, 2)
         end
+        catch
+            break
+        end
 
         # plot
         plot_period = (F.write_animation || F.DEBUG) ? 1 : 1
@@ -409,27 +402,22 @@ function main()
             # println("Long. speed: ", long_speed)
         end
 
-        writedlm("$(output_prefix)Run_$(date_string)_last_x.csv", coords.x, ',')
-        writedlm("$(output_prefix)Run_$(date_string)_last_centro_x.csv", coords.centro_x, ',')
+        writedlm("$(config["output_prefix"])Run_$(config["date_string"])_last_x.csv", coords.x, ',')
+        writedlm("$(config["output_prefix"])Run_$(config["date_string"])_last_centro_x.csv", coords.centro_x, ',')
 
         l2_norm = sqrt(sum(abs2, x))
-
-        # if l2_norm > 1e4
-        # println("Divergence detected, aborting")
-        # break
-        # end
-
-
     end
 
-    metrics["t_end"] = k*P.δt
-    barycenter_y = sum(x[:,2])/P.N
-    metrics["barycenter_y_end"] = barycenter_y
-    metrics["speed"] = (metrics["barycenter_y_end"] - metrics["barycenter_y_start"])/(metrics["t_end"] - metrics["t_start"])
-    metrics["fw0"] = P.f_ω0
-    metrics["fb"] = P.f_β
-    metrics["fwidth"] = P.f_width
-    JankoUtils.write_dict("$(output_prefix)Run_$(date_string)_metrics.yaml", metrics)
+    if F.write_metrics
+        metrics["t_end"] = k*P.δt
+        barycenter_y = sum(x[:,2])/P.N
+        metrics["barycenter_y_end"] = barycenter_y
+        metrics["speed"] = (metrics["barycenter_y_end"] - metrics["barycenter_y_start"])/(metrics["t_end"] - metrics["t_start"])
+        metrics["fw0"] = P.f_ω0
+        metrics["fb"] = P.f_β
+        metrics["fwidth"] = P.f_width
+        JankoUtils.write_dict("$(config["output_prefix"])Run_$(config["date_string"])_metrics.yaml", metrics)
+    end
 
     if F.write_animation & F.plot
         writer.finish()
