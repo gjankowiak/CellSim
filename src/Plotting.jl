@@ -127,7 +127,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 end
 
 function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.NucleusCoords,Missing}, k::Int, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::CellSimCommon.Plotables,
-                     vr::Centrosome.VisibleRegion)
+                     vr::Union{Centrosome.VisibleRegion,Missing})
 
     x = coords.x
 

@@ -32,26 +32,39 @@ macro eval_if_string(s)
     return esc(:(isa($s, String) ? eval(Meta.parse($s)) : $s))
 end
 
-function compute_initial_x(P::CSC.Params, F::CSC.Flags; convex::Bool=true)
+function compute_initial_x(P::CSC.Params, F::CSC.Flags; fill_wall::Bool=false)
     t = collect(range(0; stop=1, length=P.N+1))[1:P.N]
 
-    if convex
+    if !fill_wall
         if !F.circular_wall
             return 0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)]
         else
             return 0.5 * Float64[P.x0_a*cospi.(2t) .+ 2P.polar_shift P.x0_b*sinpi.(2t)]
         end
+    else
+        # this should probably move to Walls.jl
+        init_width = P.f_width - 1/P.f_α
+        f = (x::Array{Float64,1}) -> [P.target_area - 2*((init_width)*x[1] + P.f_β/P.f_ω0*sin(P.f_ω0*x[1] - 0.5pi))]
+        fp = (x::Array{Float64,1}) -> [-2*((init_width) - P.f_β*cos(P.f_ω0*x[1]-0.5pi))]
+        res = NLsolve.nlsolve(f, fp, [P.target_area/(2*(init_width))]; method=:broyden)
+        init_min_y = -0.5pi/P.f_ω0
+        init_max_y = res.zero[1] + init_min_y
+        width_at_front = (init_width) + P.f_β*sin(P.f_ω0*init_max_y)
+        approx_cell_perimeter = init_width - P.f_β + width_at_front + 2*init_max_y
+        np_side = Int(round(P.N * init_max_y/approx_cell_perimeter))
+        np_front = Int(round(P.N * width_at_front/approx_cell_perimeter))
+        np_back = P.N - 2*np_side - np_front
+
+        y = collect(range(init_min_y, stop=init_max_y, length=np_side))
+        x_init = [[init_width.+P.f_β*sin.(P.f_ω0*y) y];
+                  [range(width_at_front, stop=-width_at_front, length=np_front) init_max_y*ones(np_front)];
+                  [-init_width.-P.f_β*sin.(P.f_ω0*reverse(y)) reverse(y)];
+                  [range(-init_width + P.f_β, stop=init_width - P.f_β, length=np_back) init_min_y*ones(np_back)]]
+        return x_init
     end
 end
 
 function main()
-    P, F, config = read_config()
-    launch(P, F, config)
-end
-
-function read_config()
-    # initialization
-
     config_filename = "configs/default.yaml"
     if length(ARGS) > 0 && isfile(ARGS[1])
         config_filename = ARGS[1]
@@ -61,6 +74,11 @@ function read_config()
         exit(0)
     end
 
+    P, F, config = read_config(config_filename)
+    launch(P, F, config)
+end
+
+function read_config(config_filename::String)
     date_string = string(Dates.now())
 
     yaml_config = YAML.load(open(config_filename))
@@ -170,7 +188,7 @@ function read_config()
         config["output_prefix"] = "runs/"
     end
 
-    launch(P, F, config)
+    return P, F, config
 end
 
 function launch(P::CSC.Params, F::CSC.Flags, config)
@@ -216,7 +234,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
                 end
             end
         else
-            x_init = EvenParam.reparam(compute_initial_x(P, F; convex=true))
+            x_init = EvenParam.reparam(compute_initial_x(P, F; fill_wall=true))
             x_init[:,2] .+= P.x0_shift
         end
     end
@@ -232,15 +250,20 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         # the centrosome angle doesn't have any impact at this point
         coords.centro_x[:] = readdlm(load_state["filename_centro"], ',')
     else
-        # otherwise, pick the centrosome location as the initial center of mass
-        coords.centro_x[:] = sum(x_init; dims=1)/size(x_init,1)
+        if F.nucleus
+            # initizalize in the center of the nucleus
+            coords.centro_x[:] = [0.0 0.5π/P.f_ω0]
+        else
+            # otherwise, pick the centrosome location as the initial center of mass
+            coords.centro_x[:] = sum(x_init; dims=1)/size(x_init,1)
+        end
     end
 
     nucleus_coords = missing
 
     if F.nucleus
-        old_nucleus_coords = Nucleus.initialize_coords(P, F, coords)
-        nucleus_coords = Nucleus.initialize_coords(P, F, coords)
+        old_nucleus_coords = Nucleus.initialize_coords(P, F, coords; fill_wall=true)
+        nucleus_coords = Nucleus.initialize_coords(P, F, coords; fill_wall=true)
         #
         # shift nucleus to a wide section
         #
@@ -266,10 +289,14 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         zeros(1, 2)
    )
 
-    # centrosome buffers and coordinates
-    (centro_bufs, centro_vr, centro_qw, centro_pc) = Centrosome.init(P)
-    Centrosome.compute_vr(P, coords, centro_bufs, centro_vr)
-    (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, F, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables, potentials)
+    if F.centrosome
+        # centrosome buffers and coordinates
+        (centro_bufs, centro_vr, centro_qw, centro_pc) = Centrosome.init(P)
+        Centrosome.compute_vr(P, coords, centro_bufs, centro_vr)
+        (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, F, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables, potentials)
+    else
+        centro_vr = missing
+    end
 
     resi, resi_J = Cortex.wrap_residuals(coords, coords_s, potentials, P, F, plotables)
     if F.innerloop
@@ -297,6 +324,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
     prev_height = 0.0
 
     metrics = Dict{String, Float64}()
+    metrics_started = false
 
     stepping = F.DEBUG
     if !stepping
@@ -307,6 +335,13 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
 
     # outer loop
     while k < P.M
+        max_y = maximum(coords.x[:,2])
+        if metrics_started && (max_y >= metrics["target_max_y_end"])
+                println()
+                print("Target number of periods reached, finishing...")
+                println()
+            break
+        end
 
         if stepping
             println("debug: 'q' to quit, 'c' to run continuously, any other key to step, 'b' to run step by step")
@@ -329,14 +364,19 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
 
         k += 1
         print("\b"^100)
-        println(" iteration #", k, ", ")
+        print(" iteration #", k, ", ")
 
         # initialization metrics
-        if F.write_metrics
-            if k == config["metrics"]["start_iteration"]
+        if !metrics_started && F.write_metrics
+            if (F.nucleus && abs(minimum(coords.x[:,2]) - minimum(nucleus_coords.Y[:,2])) < 2/P.f_α) || (!F.nucleus && k == config["metrics"]["start_iteration"])
+                metrics_started = true
                 metrics["t_start"] = k*P.δt
-                barycenter_y = sum(x[:,2])/P.N
-                metrics["barycenter_y_start"] = barycenter_y
+                max_y = maximum(coords.x[:,2])
+                metrics["max_y_start"] = max_y
+                metrics["target_max_y_end"] = max_y + config["metrics"]["periods"]*2π/P.f_ω0
+                println()
+                print("Starting collecting metrics, stopping when head reaches y=", metrics["target_max_y_end"], " (+", config["metrics"]["periods"], ")")
+                println()
             end
         end
 
@@ -390,7 +430,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         end
 
         # plot
-        plot_period = (F.write_animation || F.DEBUG) ? 1 : 1
+        plot_period = (F.write_animation || F.DEBUG) ? 1 : 10
         if (F.plot & (k % plot_period == 0))
             Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
@@ -408,15 +448,15 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         l2_norm = sqrt(sum(abs2, x))
     end
 
-    if F.write_metrics
+    if F.write_metrics && metrics_started
         metrics["t_end"] = k*P.δt
-        barycenter_y = sum(x[:,2])/P.N
-        metrics["barycenter_y_end"] = barycenter_y
-        metrics["speed"] = (metrics["barycenter_y_end"] - metrics["barycenter_y_start"])/(metrics["t_end"] - metrics["t_start"])
+        metrics["max_y_end"] = maximum(coords.x[:,2])
+        metrics["speed"] = (metrics["max_y_end"] - metrics["max_y_start"])/(metrics["t_end"] - metrics["t_start"])
         metrics["fw0"] = P.f_ω0
         metrics["fb"] = P.f_β
         metrics["fwidth"] = P.f_width
         JankoUtils.write_dict("$(config["output_prefix"])Run_$(config["date_string"])_metrics.yaml", metrics)
+        println("Measured speed: ", metrics["speed"])
     end
 
     if F.write_animation & F.plot

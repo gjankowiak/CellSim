@@ -348,27 +348,34 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
     new_c.Y[:] = M\f
 end
 
-function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords)
+function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords; fill_wall::Bool=true)
     # The nucleus is initialized as a circle centered on the
     # barycenter of the cell, with radius P.N_r_init
 
-    bc = sum(cortex_c.x; dims=1) / P.N
     t = collect(range(0, stop=2pi, length=P.Nnuc+1))[1:P.Nnuc]
 
     θ0 = π/P.Nnuc
     θ = collect(π/2 + θ0 .+ (-1:(P.Nnuc-2))*2*θ0)
 
+    if fill_wall
+        bc = [0.0 0.5π/P.f_ω0]
+        r_init = (0.5π + P.f_width)/P.f_ω0
+    else
+        bc = sum(cortex_c.x; dims=1) / P.N
+        r_init = P.N_r_init
+    end
+
     nc = NucleusCoords(
-        P.N_r_init*[cos.(t) sin.(t)] .+ bc, # Y
+        r_init*[cos.(t) sin.(t)] .+ bc, # Y
         zeros(P.Nnuc), # α
         zeros(P.Nnuc), # β
-        1/P.N_r_init * ones(P.Nnuc), # k
-        sin(π/P.Nnuc)*2P.N_r_init * ones(P.Nnuc), # r
-        sin(π/P.Nnuc)*2P.N_r_init * ones(P.Nnuc), # q
+        1/r_init * ones(P.Nnuc), # k
+        sin(π/P.Nnuc)*2r_init * ones(P.Nnuc), # r
+        sin(π/P.Nnuc)*2r_init * ones(P.Nnuc), # q
         θ, # θ
         [sin.(θ) -cos.(θ)], # n
-        log.(sin(π/P.Nnuc)*2P.N_r_init * ones(P.Nnuc)), # η
-        2π*P.N_r_init, # L
+        log.(sin(π/P.Nnuc)*2r_init * ones(P.Nnuc)), # η
+        2π*r_init, # L
         CSC.init_circ_idx(P.Nnuc) # circ_idx
        )
 
