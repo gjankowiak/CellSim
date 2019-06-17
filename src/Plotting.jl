@@ -288,7 +288,7 @@ function plot_metrics(m::Dict)
         PyPlot.plot(4π*m["inst_nucleus_area"]./(m["inst_nucleus_perimeter"].^2), label="nucleus")
     end
     PyPlot.axhline(1.0)
-    PyPlot.title("4pi Area/Perimeter^2")
+    PyPlot.title("Roundness (4π Area/Perimeter²)")
     PyPlot.legend()
     if haskey(m, "inst_n2c_distance")
         PyPlot.subplot(232)
