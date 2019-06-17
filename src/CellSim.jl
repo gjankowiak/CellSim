@@ -8,6 +8,8 @@ import Nucleus
 import Wall
 import Masks
 
+import Metrics
+
 import Plotting
 
 import Centrosome
@@ -244,6 +246,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
 
     Cortex.init_FD_matrices(P)
     coords, coords_s = Cortex.new_PointCoords(x, P)
+    old_coords = deepcopy(coords)
 
     if haskey(config, "load_state") && load_state["do_load"] && load_state["init_centro"]
         # if the initial centrosome location is given in the config, load it
@@ -262,15 +265,14 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
     nucleus_coords = missing
 
     if F.nucleus
-        old_nucleus_coords = Nucleus.initialize_coords(P, F, coords; fill_wall=true)
         nucleus_coords = Nucleus.initialize_coords(P, F, coords; fill_wall=true)
+        if haskey(config, "load_state") && haskey(load_state, "shift_nucleus")
+            nucleus_coords.Y[:] = nucleus_coords.Y .- sum(nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 load_state["shift_nucleus"]]
+        end
+        old_nucleus_coords = deepcopy(nucleus_coords)
         #
         # shift nucleus to a wide section
         #
-        if haskey(config, "load_state") && haskey(load_state, "shift_nucleus")
-            old_nucleus_coords.Y[:] = old_nucleus_coords.Y .- sum(old_nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 load_state["shift_nucleus"]]
-            nucleus_coords.Y[:] = nucleus_coords.Y .- sum(nucleus_coords.Y; dims=1)/P.Nnuc .+ [0.0 load_state["shift_nucleus"]]
-        end
 
         temparrays = CSC.TempArrays6(
                                      zeros(P.Nnuc),
@@ -312,6 +314,10 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
     end
 
     if F.plot
+        plot_period = (F.write_animation || F.DEBUG) ? 1 : 10
+        if haskey(config, "plot_period")
+            plot_period = config["plot_period"]
+        end
         fig = Plotting.init_plot(coords, P, F)
         Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
         if F.write_animation
@@ -336,7 +342,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
     # outer loop
     while k < P.M
         max_y = maximum(coords.x[:,2])
-        if metrics_started && (max_y >= metrics["target_max_y_end"])
+        if metrics_started && (max_y >= metrics["target_max_y"])
                 println()
                 print("Target number of periods reached, finishing...")
                 println()
@@ -370,12 +376,9 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         if !metrics_started && F.write_metrics
             if (F.nucleus && abs(minimum(coords.x[:,2]) - minimum(nucleus_coords.Y[:,2])) < 2/P.f_α) || (!F.nucleus && k == config["metrics"]["start_iteration"])
                 metrics_started = true
-                metrics["t_start"] = k*P.δt
-                max_y = maximum(coords.x[:,2])
-                metrics["max_y_start"] = max_y
-                metrics["target_max_y_end"] = max_y + config["metrics"]["periods"]*2π/P.f_ω0
+                metrics = Metrics.init_metrics(k, P, F, config, coords, nucleus_coords)
                 println()
-                print("Starting collecting metrics, stopping when head reaches y=", metrics["target_max_y_end"], " (+", config["metrics"]["periods"], ")")
+                print("Starting collecting metrics, stopping when head reaches y=", metrics["target_max_y"], " (+", config["metrics"]["periods"], ")")
                 println()
             end
         end
@@ -398,7 +401,6 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
             end
             Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays)
 
-            Nucleus.copy(old_nucleus_coords, nucleus_coords)
         end
 
         if F.cortex
@@ -425,12 +427,22 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
             δx[:] = -Jr_x\r_x
             x .+= + reshape(δx, P.N, 2)
         end
-        catch
+
+        if metrics_started
+            Metrics.update_metrics(metrics, k, P, F, config, coords, coords_s, old_coords, nucleus_coords)
+        end
+
+        if F.cortex
+            Cortex.copy(old_coords, coords)
+        end
+        if F.nucleus
+            Nucleus.copy(old_nucleus_coords, nucleus_coords)
+        end
+        catch e
             break
         end
 
         # plot
-        plot_period = (F.write_animation || F.DEBUG) ? 1 : 10
         if (F.plot & (k % plot_period == 0))
             Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
@@ -439,30 +451,25 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
             height = sum(x[:,2]/P.N)
             long_speed = (height - prev_height) / (plot_period*P.δt)
             prev_height = height
-            # println("Long. speed: ", long_speed)
         end
 
         writedlm("$(config["output_prefix"])Run_$(config["date_string"])_last_x.csv", coords.x, ',')
         writedlm("$(config["output_prefix"])Run_$(config["date_string"])_last_centro_x.csv", coords.centro_x, ',')
-
-        l2_norm = sqrt(sum(abs2, x))
     end
 
     if F.write_metrics && metrics_started
-        metrics["t_end"] = k*P.δt
-        metrics["max_y_end"] = maximum(coords.x[:,2])
-        metrics["speed"] = (metrics["max_y_end"] - metrics["max_y_start"])/(metrics["t_end"] - metrics["t_start"])
-        metrics["fw0"] = P.f_ω0
-        metrics["fb"] = P.f_β
-        metrics["fwidth"] = P.f_width
-        JankoUtils.write_dict("$(config["output_prefix"])Run_$(config["date_string"])_metrics.yaml", metrics)
-        println("Measured speed: ", metrics["speed"])
+        Metrics.close_metrics(metrics, k, P)
+        Metrics.save_metrics(metrics, "$(config["output_prefix"])Run_$(config["date_string"])")
     end
 
     if F.write_animation & F.plot
         writer.finish()
     end
     println("Finished")
+
+    if F.plot && metrics_started
+        Plotting.plot_metrics(metrics)
+    end
 
     return
 end

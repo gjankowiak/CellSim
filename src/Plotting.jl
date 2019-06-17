@@ -9,6 +9,7 @@ import PyCall
 animation = PyCall.pyimport("matplotlib.animation")
 
 import CellSimCommon
+const CSC = CellSimCommon
 import Centrosome
 import Cortex
 import Nucleus
@@ -262,6 +263,39 @@ function init_animation(prefix::String, date_string::String)
     metadata = Dict((:title => string(prefix, "Run_", date_string), :artist => "GJ"))
     writer = FFMpegWriter(fps=15, metadata=metadata)
     return writer
+end
+
+function plot_metrics(m::Dict)
+    n_data_points = length(m["inst_max_y"])
+    PyPlot.figure()
+    PyPlot.subplot(231)
+    println(typeof(m["inst_max_y"]))
+    PyPlot.plot(m["inst_max_y"])
+    PyPlot.title("Position of the tip")
+    PyPlot.subplot(234)
+    PyPlot.plot(m["inst_velocity"])
+    PyPlot.title("Velocity")
+    PyPlot.subplot(233)
+    PyPlot.plot(m["inst_cortex_area"], label="Cortex")
+    if haskey(m, "inst_nucleus_area")
+        PyPlot.plot(m["inst_nucleus_area"], label="Nucleus")
+    end
+    PyPlot.title("Area")
+    PyPlot.legend()
+    PyPlot.subplot(236)
+    PyPlot.plot(4π*m["inst_cortex_area"]./(m["inst_cortex_perimeter"].^2), label="Cortex")
+    if haskey(m, "inst_nucleus_area")
+        PyPlot.plot(4π*m["inst_nucleus_area"]./(m["inst_nucleus_perimeter"].^2), label="nucleus")
+    end
+    PyPlot.axhline(1.0)
+    PyPlot.title("4pi Area/Perimeter^2")
+    PyPlot.legend()
+    if haskey(m, "inst_n2c_distance")
+        PyPlot.subplot(232)
+        PyPlot.plot(m["inst_n2c_distance"])
+        PyPlot.title("Centrosome to nucleus barycenter")
+    end
+    PyPlot.show()
 end
 
 

@@ -106,6 +106,30 @@ function new_PointCoords(N::Int64)
     return coords, coords_shifted
 end
 
+function copy(dst::PointCoords, src::PointCoords)
+    dst.x[:] = src.x[:]
+    dst.Δx[:] = src.Δx[:]
+    dst.Δ2x[:] = src.Δ2x[:]
+    dst.Δ2x_perp[:] = src.Δ2x_perp[:]
+    dst.ΔL[:] = src.ΔL[:]
+    dst.Δ2L[:] = src.Δ2L[:]
+    dst.ell[:] = src.ell[:]
+    dst.τ[:] = src.τ[:]
+    dst.τc[:] = src.τc[:]
+    dst.v[:] = src.v[:]
+    dst.vc[:] = src.vc[:]
+    dst.dτc[:] = src.dτc[:]
+    dst.d2τ[:] = src.d2τ[:]
+    dst.d3τ[:] = src.d3τ[:]
+    dst.dvc[:] = src.dvc[:]
+    dst.dvΔL[:] = src.dvΔL[:]
+    dst.vd2τ[:] = src.vd2τ[:]
+    dst.d1vd2τ[:] = src.d1vd2τ[:]
+    dst.d2vd2τ[:] = src.d2vd2τ[:]
+    dst.centro_x[:] = src.centro_x[:]
+    dst.centro_angle[:] = src.centro_angle[:]
+end
+
 function new_PointCoords(x::Matrix{Float64}, P::Params)
     N = size(x, 1)
     coords, coords_shifted = new_PointCoords(N)
@@ -537,7 +561,7 @@ function split_cumsum(a::Array{Float64,1}, idx)
 
     aux = zeros(size(a))
 
-    dist_left = copy(a)
+    dist_left = Base.copy(a)
     dist_left[idx] = 0.0
     circshift!(aux, dist_left, N-idx)
     reverse!(aux)
@@ -545,7 +569,7 @@ function split_cumsum(a::Array{Float64,1}, idx)
     reverse!(aux)
     circshift!(dist_left, aux, idx-N)
 
-    dist_right = copy(a)
+    dist_right = Base.copy(a)
     dist_right[idx] = 0.0
     circshift!(aux, dist_right, 1-idx)
     cumsum!(aux, aux)
