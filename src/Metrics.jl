@@ -62,7 +62,7 @@ end
 function close_metrics(m::Dict, iter::Int64, P::CSC.Params)
     m["t_end"] = iter*P.δt
     m["max_y_end"] = m["inst_max_y"][end]
-    m["average_velocity"] = (m["max_y_start"] - m["max_y_end"])/(m["t_end"] - m["t_start"])
+    m["average_velocity"] = (m["max_y_end"] - m["max_y_start"])/(m["t_end"] - m["t_start"])
 end
 
 function save_metrics(m::Dict, prefix::String)
