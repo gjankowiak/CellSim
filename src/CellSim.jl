@@ -190,6 +190,10 @@ function read_config(config_filename::String)
         config["output_prefix"] = "runs/"
     end
 
+    if (config["metrics"]["start_iteration"] <= 0) && !F.nucleus
+        println("[WARNING] metrics.start_iteration is non-positive and nucleus is deactivated, metrics will never start!")
+    end
+
     return P, F, config
 end
 
@@ -330,7 +334,11 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
     prev_height = 0.0
 
     metrics = Dict{String, Float64}()
+    post_init_periods = get(config["metrics"], "post_init_periods", 0)
+    metrics_pre_init_done = false
+    post_init_target_max_y = Inf
     metrics_started = false
+
 
     stepping = F.DEBUG
     if !stepping
@@ -372,10 +380,39 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         print("\b"^100)
         print(" iteration #", k, ", ")
 
-        # initialization metrics
-        if !metrics_started && F.write_metrics
-            if (F.nucleus && abs(minimum(coords.x[:,2]) - minimum(nucleus_coords.Y[:,2])) < 2/P.f_α) || (!F.nucleus && k == config["metrics"]["start_iteration"])
-                metrics_started = true
+        # Metrics initialization
+        #
+        # There are 2 ways to initialize:
+        #    - using a fixed starting iteration. This uses the key "start_iteration" in the config file.
+        #      If the value is positive, it will be the method used.
+        #    - using a 2 stage initialization based on the distance between cortex and nucleus
+        #      We detect the time when the distance between the back of the nucleus and the back
+        #      of the cortex is smaller that the interaction distance (2/P.f_α)
+        #
+        #   Once one of previous condition is met, we then wait for the cell to cross
+        #   "post_init_periods" after which we start recording metrics for "periods" periods.
+        #
+        if F.write_metrics && !metrics_started
+                if !metrics_pre_init_done
+                    if config["metrics"]["start_iteration"] > 0
+                        if k == config["metrics"]["start_iteration"]
+                            metrics_pre_init_done = true
+                        end
+                    else
+                        if (F.nucleus && abs(minimum(coords.x[:,2]) - minimum(nucleus_coords.Y[:,2])) < 2/P.f_α)
+                            metrics_pre_init_done = true
+                        end
+                    end
+                    if metrics_pre_init_done
+                        post_init_target_max_y = maximum(coords.x[:,2]) + 2π/P.f_ω0
+                        println()
+                        print("Starting post initialization, starting when head reaches y=", post_init_target_max_y)
+                        println()
+                    end
+                elseif maximum(coords.x[:,2]) >= post_init_target_max_y
+                    metrics_started = true
+                end
+            if metrics_started
                 metrics = Metrics.init_metrics(k, P, F, config, coords, nucleus_coords)
                 println()
                 print("Starting collecting metrics, stopping when head reaches y=", metrics["target_max_y"], " (+", config["metrics"]["periods"], ")")
