@@ -118,8 +118,8 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
     ax.set_xlim((x_mid-x_span, x_mid+x_span))
     ax.set_ylim((y_mid-y_span, y_mid+y_span))
 
-    fig.tight_layout()
     PyPlot.draw()
+    # fig.tight_layout()
 
     sleep(0.001)
     # println("Finishing plot init...")
@@ -270,11 +270,20 @@ function plot_metrics(m::Dict)
     PyPlot.figure()
     PyPlot.subplot(231)
     println(typeof(m["inst_max_y"]))
-    PyPlot.plot(m["inst_max_y"])
-    PyPlot.title("Position of the tip")
+    PyPlot.plot(m["inst_max_y"], label="tip")
+    if haskey(m, "inst_bc")
+        PyPlot.plot(m["inst_bc"][:,2], label="barycenter")
+    end
+    if haskey(m, "inst_cs")
+        PyPlot.plot(m["inst_cs"][:,2], label="centrosome")
+    end
+    PyPlot.legend()
+    PyPlot.title("Position")
     PyPlot.subplot(234)
-    PyPlot.plot(m["inst_velocity"])
+    PyPlot.plot(m["inst_velocity"], label="tip")
+    PyPlot.plot(m["inst_bc_velocity"], label="barycenter")
     PyPlot.title("Velocity")
+    PyPlot.legend()
     PyPlot.subplot(233)
     PyPlot.plot(m["inst_cortex_area"], label="Cortex")
     if haskey(m, "inst_nucleus_area")
@@ -290,13 +299,16 @@ function plot_metrics(m::Dict)
     PyPlot.axhline(1.0)
     PyPlot.title("Roundness (4π Area/Perimeter²)")
     PyPlot.legend()
+    PyPlot.subplot(232)
+    PyPlot.title("Distances")
     if haskey(m, "inst_n2c_distance")
-        PyPlot.subplot(232)
-        PyPlot.plot(m["inst_n2c_distance"])
-        PyPlot.title("Centrosome to nucleus barycenter")
+        PyPlot.plot(m["inst_n2c_distance"], label="Nucleus barycenter to centrosome")
     end
+    if haskey(m, "inst_bc2cs_distance")
+        PyPlot.plot(m["inst_bc2cs_distance"], label="Cortex barycenter to centrosome")
+    end
+    PyPlot.legend()
     PyPlot.show()
 end
-
 
 end

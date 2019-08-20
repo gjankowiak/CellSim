@@ -53,10 +53,11 @@ struct QuadratureWeights
     delta::Vector{Float64}
     A1::Vector{Float64}
     A2::Array{Float64,2}
+    A3::Array{Float64,2}
     a::Vector{Float64}
     b::Vector{Float64}
-    tmp1::Array{Float64,2}
-    tmp2::Array{Float64,2}
+    nodes_perp::Array{Float64,2}
+    diffs_perp::Array{Float64,2}
     tmp3::Array{Float64,2}
     tmp4::Array{Float64,2}
 end
@@ -75,9 +76,9 @@ function init(P::CSC.Params)
     qw = QuadratureWeights(zeros(P.N+1), zeros(P.N+1), zeros(P.N+1), # c0, c1, c2
                            zeros(P.N+1), zeros(P.N+1), zeros(P.N+1), # I0, I1, I2,
                            zeros(P.N+1), zeros(P.N+1), zeros(P.N+1), # w0, w1, w2
-                           zeros(P.N+1), zeros(P.N+1), zeros(P.N+1, 2), # delta, A1, A2
+                           zeros(P.N+1), zeros(P.N+1), zeros(P.N+1, 2), zeros(P.N+1, 2), # delta, A1, A2, A3
                            zeros(P.N+1), zeros(P.N+1), # a, b
-                           zeros(P.N+1,2), zeros(P.N+1,2), # tmp1, tmp2
+                           zeros(P.N+1,2), zeros(P.N+1,2), # nodes_perp, diffs_perp
                            zeros(P.N+1,2), zeros(P.N+1,2)) # tmp3, tmp4
     θ = zeros(P.N+1)
     r = zeros(P.N+1)
@@ -130,12 +131,15 @@ function compute_quadrature_weights(vr::VisibleRegion, qw::QuadratureWeights)
         # ∫ λ² dλ/|c0 + c1 λ + c2 λ²|
         qw.I2[idx] = @. -qw.c1[idx]/qw.c2[idx]*qw.I1[idx] - qw.c0[idx]/qw.c2[idx]*qw.I0[idx] + 1/qw.c2[idx]
 
-        qw.tmp1[:,1] = -vr.nodes[:,2]
-        qw.tmp1[:,2] =  vr.nodes[:,1]
-        qw.tmp2[:,1] = -vr.diffs[:,2]
-        qw.tmp2[:,2] =  vr.diffs[:,1]
+        # (X_i - X_c)^⊥
+        qw.nodes_perp[:,1] = -vr.nodes[:,2]
+        qw.nodes_perp[:,2] =  vr.nodes[:,1]
 
-        qw.tmp3[:,1] = abs.(sum(qw.tmp2.*vr.nodes; dims=2))
+        # (X_i+1 - X_i)^⊥
+        qw.diffs_perp[:,1] = -vr.diffs[:,2]
+        qw.diffs_perp[:,2] =  vr.diffs[:,1]
+
+        qw.tmp3[:,1] = abs.(sum(qw.diffs_perp.*vr.nodes; dims=2))
 
         qw.w0 .= qw.tmp3[:,1].*qw.I0
         qw.w1 .= qw.tmp3[:,1].*qw.I1
@@ -145,11 +149,15 @@ function compute_quadrature_weights(vr::VisibleRegion, qw::QuadratureWeights)
     qw.A1 .= 0.0
     qw.A2 .= 0.0
 
-    @views qw.A1[1:vr.n] = qw.w0[1:vr.n] .- qw.w1[1:vr.n] .+ qw.w1[idx_m]
+    @views qw.A1[1:vr.n] = qw.tmp3[1:vr.n,1].*(qw.I0[1:vr.n] - qw.I1[1:vr.n]) + qw.tmp3[idx_m,1].*qw.I1[idx_m]
 
-    @views qw.A2[1:vr.n,:] = @. (qw.tmp3[1:vr.n,1] * (qw.tmp1[1:vr.n,:]*(qw.I0[1:vr.n] .- qw.I1[1:vr.n])
-                                                   + qw.tmp2[1:vr.n,:]*(qw.I1[1:vr.n] .- qw.I2[1:vr.n]))
-                                 .+ qw.tmp3[idx_m,1] * (qw.tmp1[idx_m,:]*qw.I1[idx_m] .+ qw.tmp2[idx_m,:]*qw.I2[idx_m]))
+    @views qw.A2[1:vr.n,:] = @. (qw.tmp3[1:vr.n,1] * (qw.nodes_perp[1:vr.n,:] * (qw.I0[1:vr.n] - qw.I1[1:vr.n])
+                                                      + qw.diffs_perp[1:vr.n,:] * (qw.I1[1:vr.n] - qw.I2[1:vr.n]))
+                                 + qw.tmp3[idx_m,1] * (qw.nodes_perp[idx_m,:] * qw.I1[idx_m] + qw.diffs_perp[idx_m,:]*qw.I2[idx_m]))
+
+    # @views qw.A3[1:vr.n,:] = @. (qw.tmp3[1:vr.n,1] * (vr.nodes[1:vr.n,:]*(qw.I0[1:vr.n] .- qw.I1[1:vr.n])
+                                                   # + vr.diffs[1:vr.n,:]*(qw.I1[1:vr.n] .- qw.I2[1:vr.n]))
+                                 # .+ qw.tmp3[idx_m,1] * (vr.nodes[idx_m,:]*qw.I1[idx_m] .+ vr.diffs[idx_m,:]*qw.I2[idx_m]))
 
 end
 
@@ -191,6 +199,10 @@ function integrate_θ_eθ(f::Array{Float64}, qw::QuadratureWeights, vr::VisibleR
     return @views sum(qw.A2[1:vr.n,:].*f[1:vr.n,:])
 end
 
+function integrate_θ_er(g::Array{Float64}, qw::QuadratureWeights, vr::VisibleRegion)
+    return @views sum(qw.A3[1:vr.n,:].*g[1:vr.n,:]; dims=1)
+end
+
 function interpolate_on_nodes(f::Array{Float64}, vr::VisibleRegion)
     return vr.M_inter*f
 end
@@ -215,7 +227,7 @@ function assemble_system(P::CSC.Params, F::CSC.Flags,
 
     #= compute using quadrature =#
     A[3,3] = integrate_θ(pc.r.^2, qw, vr)[1]
-    A[1:2,3] = integrate_θ(qw.tmp1, qw, vr)
+    A[1:2,3] = integrate_θ(qw.nodes_perp, qw, vr)
 
     A[3,1] = A[1,3]
     A[3,2] = A[2,3]
@@ -233,8 +245,37 @@ function assemble_system(P::CSC.Params, F::CSC.Flags,
 
     compute_mt_longi_force(vr, P, plotables)
 
+    p = P.MT_potential_power
+    k = P.MT_factor
+    # α + 1 = -p
+
+    # ∫ F_MT = ∫ - k f(|X(s) - Xc|) |Π_MT^(-1)'(s)| ds
+    #        = ∫ - k |X(s) - Xc|^(-α) |Π_MT^(-1)'(s)| ds
+    # 1st var:
+    # -k ∫ |X(s)-Xc|^(-(α+3)) [ - (α+3) |X(s) - Xc|^(-2) ∂sX⊥.(X(s)-Xc) [(X(s)-Xc)⊗(X(s)-Xc)]
+    #                           + (X(s)-Xc)⊗∂sX⊥
+    #                           - ∂sX⊥.(X(s)-Xc) I₂ ] δXc ds
+    # = -k ∫ |X(s)-Xc^(-(α+3)) [ T1 + T2 + T3 ] δXc ds
+    #
+    # 1st var ignoring |Π_MT^-¹'|
+    # = -k ∫ |X(s)-Xc^(-(α+1)) [ (α+1)|X(s)-Xc|^-¹ (X(s)-Xc)⊗(X(s)-Xc) - I₂ ] δXc |Π_MT^-¹'| ds
+
+    # |X(s) - Xc|
+    norm_nodes = abs.(CSC.@entry_norm(vr.nodes[1:vr.n,:]))
+
+    diff_mt_force_col_1 = -k*norm_nodes[1:vr.n,:].^p .* (((-p).*vr.nodes[1:vr.n,1].*vr.nodes[1:vr.n,:]./norm_nodes[1:vr.n,:]
+                                                                 - repeat([1 0], vr.n))
+                                                                + (2 ./norm_nodes[1:vr.n,:].^2 .*vr.nodes[1:vr.n,1]) .* vr.nodes[1:vr.n,:])
+    diff_mt_force_col_2 = -k*norm_nodes[1:vr.n,:].^p .* (((-p).*vr.nodes[1:vr.n,2].*vr.nodes[1:vr.n,:]./norm_nodes[1:vr.n,:]
+                                                                 - repeat([0 1], vr.n))
+                                                                + (2 ./norm_nodes[1:vr.n,:].^2 .*vr.nodes[1:vr.n,2]) .* vr.nodes[1:vr.n,:])
+
     # ∫ F_MT
     b_ce_n[1:2] = integrate_θ(plotables.mt_force_indiv, qw, vr)
+
+    # ∫ F_MT'
+    A[1:2,1] += -vec(P.δt*integrate_θ(diff_mt_force_col_1, qw, vr))
+    A[1:2,2] += -vec(P.δt*integrate_θ(diff_mt_force_col_2, qw, vr))
 
     #  - k_MT ∫ ds/dt ∂_s Xθ^n
     b_ce_n[1:2] +=  - P.k_MT*reshape(integrate_θ(vr.M_inter*reshape(plotables.transport_force, P.N, 2), qw, vr), 2, 1)
