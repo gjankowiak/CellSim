@@ -359,7 +359,7 @@ function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords; fill_wall
 
     if fill_wall
         bc = [0.0 0.5π/P.f_ω0]
-        r_init = (0.5π + P.f_width)/P.f_ω0
+        r_init = min(P.f_width + P.f_β - 2/P.f_α, (0.5π + P.f_width)/P.f_ω0)
     else
         bc = sum(cortex_c.x; dims=1) / P.N
         r_init = P.N_r_init
