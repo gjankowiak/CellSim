@@ -39,13 +39,13 @@ function compute_initial_x(P::CSC.Params, F::CSC.Flags; fill_wall::Bool=false)
 
     if !fill_wall
         if !F.circular_wall
-            return 0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)]
+            return (0.5 * Float64[P.x0_a*cospi.(2t) P.x0_b*sinpi.(2t)], [0.0; 0.0])
         else
-            return 0.5 * Float64[P.x0_a*cospi.(2t) .+ 2P.polar_shift P.x0_b*sinpi.(2t)]
+            return (0.5 * Float64[P.x0_a*cospi.(2t) .+ 2P.polar_shift P.x0_b*sinpi.(2t)], [0.0; 0.0])
         end
     else
         # this should probably move to Walls.jl
-        init_width = P.f_width - 1/P.f_α
+        init_width = P.f_width - 0.9/P.f_α
         f = (x::Array{Float64,1}) -> [P.target_area - 2*((init_width)*x[1] + P.f_β/P.f_ω0*sin(P.f_ω0*x[1] - 0.5pi))]
         fp = (x::Array{Float64,1}) -> [-2*((init_width) - P.f_β*cos(P.f_ω0*x[1]-0.5pi))]
         res = NLsolve.nlsolve(f, fp, [P.target_area/(2*(init_width))]; method=:broyden)
@@ -62,7 +62,8 @@ function compute_initial_x(P::CSC.Params, F::CSC.Flags; fill_wall::Bool=false)
                   [range(width_at_front, stop=-width_at_front, length=np_front) init_max_y*ones(np_front)];
                   [-init_width.-P.f_β*sin.(P.f_ω0*reverse(y)) reverse(y)];
                   [range(-init_width + P.f_β, stop=init_width - P.f_β, length=np_back) init_min_y*ones(np_back)]]
-        return x_init
+        mid_pulse = 2π/P.f_ω0*(0.25+round(0.5*res.zero[1]/(2π/P.f_ω0) - 0.5, RoundNearest))
+        return (x_init, [0.0; mid_pulse])
     end
 end
 
@@ -248,7 +249,9 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
                 end
             end
         else
-            x_init = EvenParam.reparam(compute_initial_x(P, F; fill_wall=true))
+
+            (x_init, centro_x_init) = compute_initial_x(P, F; fill_wall=true)
+            x_init[:] = EvenParam.reparam(x_init)
             x_init[:,2] .+= P.x0_shift
         end
     end
@@ -271,6 +274,9 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         else
             # otherwise, pick the centrosome location as the initial center of mass
             coords.centro_x[:] = sum(x_init; dims=1)/size(x_init,1)
+            if !F.circular_wall
+                coords.centro_x[:] = centro_x_init
+            end
         end
     end
 
