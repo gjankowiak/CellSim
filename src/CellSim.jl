@@ -332,10 +332,10 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
     end
 
     if F.plot
-        plot_period = (F.write_animation || F.DEBUG) ? 1 : 10
         if haskey(config, "plot_period")
             plot_period = config["plot_period"]
         end
+        plot_period = F.DEBUG ? 1 : 10
         fig = Plotting.init_plot(coords, P, F)
         Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
         if F.write_animation
@@ -490,11 +490,14 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
             Nucleus.copy(old_nucleus_coords, nucleus_coords)
         end
         catch e
+            println()
+            println("ERROR at iteration ", k, ":")
+            println(e)
             break
         end
 
         # plot
-        if (F.plot & (k % plot_period == 0))
+        if (F.plot && (k % plot_period == 0))
             Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
                 writer.grab_frame()
@@ -513,7 +516,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         Metrics.save_metrics(metrics, "$(config["output_prefix"])Run_$(config["date_string"])")
     end
 
-    if F.write_animation & F.plot
+    if F.write_animation && F.plot
         writer.finish()
     end
     println("Finished")
