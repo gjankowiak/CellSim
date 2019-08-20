@@ -199,6 +199,14 @@ end
 
 function launch(P::CSC.Params, F::CSC.Flags, config)
 
+    if haskey(config, "output_prefix")
+        if !endswith(config["output_prefix"], "/")
+            config["output_prefix"] = config["output_prefix"] * "/"
+        end
+    else
+        config["output_prefix"] = "runs/"
+    end
+
     run(`mkdir -p runs`)
     run(`mkdir -p dumps`)
     run(`mkdir -p $(config["output_prefix"])`)
