@@ -311,4 +311,8 @@ function plot_metrics(m::Dict)
     PyPlot.show()
 end
 
+function close()
+    PyPlot.close("all")
+end
+
 end
