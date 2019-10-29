@@ -82,8 +82,6 @@ function main()
 end
 
 function read_config(config_filename::String)
-    date_string = string(Dates.now())
-
     yaml_config = YAML.load(open(config_filename))
     y_params = yaml_config["params"]
 
@@ -181,7 +179,6 @@ function read_config(config_filename::String)
 
     config = yaml_config["config"]
     config["config_filename"] = config_filename
-    config["date_string"] = date_string
 
     if haskey(config, "output_prefix")
         if !endswith(config["output_prefix"], "/")
@@ -199,6 +196,9 @@ function read_config(config_filename::String)
 end
 
 function launch(P::CSC.Params, F::CSC.Flags, config)
+
+    date_string = string(Dates.now())
+    config["date_string"] = date_string
 
     if haskey(config, "output_prefix")
         if !endswith(config["output_prefix"], "/")
