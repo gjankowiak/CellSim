@@ -46,16 +46,22 @@ function compute_initial_x(P::CSC.Params, F::CSC.Flags; fill_wall::Bool=false)
     else
         # this should probably move to Walls.jl
         init_width = P.f_width - 0.9/P.f_α
+        @assert init_width > 0
         f = (x::Array{Float64,1}) -> [P.target_area - 2*((init_width)*x[1] + P.f_β/P.f_ω0*sin(P.f_ω0*x[1] - 0.5pi))]
         fp = (x::Array{Float64,1}) -> [-2*((init_width) - P.f_β*cos(P.f_ω0*x[1]-0.5pi))]
         res = NLsolve.nlsolve(f, fp, [P.target_area/(2*(init_width))]; method=:broyden)
         init_min_y = -0.5pi/P.f_ω0
         init_max_y = res.zero[1] + init_min_y
         width_at_front = (init_width) + P.f_β*sin(P.f_ω0*init_max_y)
+        @assert width_at_front > 0
         approx_cell_perimeter = init_width - P.f_β + width_at_front + 2*init_max_y
         np_side = Int(round(P.N * init_max_y/approx_cell_perimeter))
         np_front = Int(round(P.N * width_at_front/approx_cell_perimeter))
         np_back = P.N - 2*np_side - np_front
+        if np_back < 4
+            np_front = div(P.N - 2*np_side, 2)
+            np_back = P.N - 2*np_side - np_front
+        end
 
         y = collect(range(init_min_y, stop=init_max_y, length=np_side))
         x_init = [[init_width.+P.f_β*sin.(P.f_ω0*y) y];
