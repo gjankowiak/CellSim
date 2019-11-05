@@ -68,6 +68,7 @@ PyPlot.title("Velocity vs kMT")
 # channel depth
 PyPlot.subplot(245)
 plot_csv("plot_data/v_beta_nuc_old.csv", true, label="nuc old")
+plot_csv("plot_data/v_beta_nuc_new.csv", true, label="nuc new")
 plot_csv("plot_data/v_beta_nonuc.csv", false, label="nonuc", ls="dotted")
 PyPlot.axhline(0.0, lw=0.5, color="black")
 PyPlot.legend()
