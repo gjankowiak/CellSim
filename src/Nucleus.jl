@@ -70,6 +70,61 @@ function g_p(x::Vector{Float64}, α::Float64)
     return -(2α*min.(α*x.-1, 0.0).*log.(α*x) .+ min.(α*x.-1, 0.0).^2 ./x)
 end
 
+function compute_curvature(c::NucleusCoords)
+    A = zeros(3,3)
+    b = zeros(3)
+
+    Nnuc = size(c.Y, 1)
+
+    for i in 1:Nnuc
+        A[1,1] = 8*( c.Y[c.circ_idx.m2[i],1]^2
+                    +c.Y[c.circ_idx.m1[i],1]^2
+                    +c.Y[i,1]^2
+                    +c.Y[c.circ_idx.p1[i],1]^2)
+        A[1,2] = 8*( c.Y[c.circ_idx.m2[i],1]*c.Y[c.circ_idx.m2[i],2]
+                     +c.Y[c.circ_idx.m1[i],1]*c.Y[c.circ_idx.m1[i],2]
+                     +c.Y[i,1]*c.Y[i,2]
+                     +c.Y[c.circ_idx.p1[i],1]*c.Y[c.circ_idx.p1[i],2])
+        A[2,1] = A[1,2]
+        A[1,3] = -4*( c.Y[c.circ_idx.m2[i],1]
+                    +c.Y[c.circ_idx.m1[i],1]
+                    +c.Y[i,1]
+                    +c.Y[c.circ_idx.p1[i],1])
+        A[3,1] = A[1,3]
+        A[2,2] = 8*( c.Y[c.circ_idx.m2[i],2]^2
+                    +c.Y[c.circ_idx.m1[i],2]^2
+                    +c.Y[i,2]^2
+                    +c.Y[c.circ_idx.p1[i],2]^2)
+        A[2,3] = -4*( c.Y[c.circ_idx.m2[i],2]
+                    +c.Y[c.circ_idx.m1[i],2]
+                    +c.Y[i,2]
+                    +c.Y[c.circ_idx.p1[i],2])
+        A[3,2] = A[2,3]
+        A[3,3] = 8
+
+        b[1] = 4*( c.Y[c.circ_idx.m2[i],1]^3
+                    +c.Y[c.circ_idx.m1[i],1]^3
+                    +c.Y[i,1]^3
+                    +c.Y[c.circ_idx.p1[i],1]^3
+                    +c.Y[c.circ_idx.m2[i],1]*c.Y[c.circ_idx.m2[i],2]^2
+                    +c.Y[c.circ_idx.m1[i],1]*c.Y[c.circ_idx.m1[i],2]^2
+                    +c.Y[i,1]*c.Y[i,2]^2
+                    +c.Y[c.circ_idx.p1[i],1]*c.Y[c.circ_idx.p1[i],2]^2)
+        b[2] = 4*( c.Y[c.circ_idx.m2[i],2]^3
+                    +c.Y[c.circ_idx.m1[i],2]^3
+                    +c.Y[i,2]^3
+                    +c.Y[c.circ_idx.p1[i],2]^3
+                    +c.Y[c.circ_idx.m2[i],1]^2*c.Y[c.circ_idx.m2[i],2]
+                    +c.Y[c.circ_idx.m1[i],1]^2*c.Y[c.circ_idx.m1[i],2]
+                    +c.Y[i,1]^2*c.Y[i,2]
+                    +c.Y[c.circ_idx.p1[i],1]^2*c.Y[c.circ_idx.p1[i],2])
+        b[3] = -0.25*(A[1,1] + A[2,2])
+
+        x = A\b
+        c.k[i] = 1/sqrt(x[1]^2 + x[2]^2 - x[3])
+    end
+end
+
 function recompute_nucleus_coords(c::NucleusCoords)
     delta_Y = c.Y - c.Y[c.circ_idx.m1,:]
     c.r[:] = sqrt.(sum(abs2, delta_Y; dims=2))
@@ -79,15 +134,7 @@ function recompute_nucleus_coords(c::NucleusCoords)
     delta_θ = rem.(c.θ - c.θ[c.circ_idx.m1], 2π, RoundNearest)
     c.θ[:] = cumsum([c.θ[1]; delta_θ[1:end-1]])
 
-    # http://cral-labo.univ-lyon1.fr/labo/fc/Ateliers_archives/ateliers_2005-06/cercle_3pts.pdf
-    xc = (0.5*(c.Y[c.circ_idx.p1,1].^2 - c.Y[:,1].^2 + c.Y[c.circ_idx.p1,2].^2 - c.Y[:,2].^2) ./ (c.Y[c.circ_idx.p1,2]-c.Y[:,2])
-          - 0.5*(c.Y[:,1].^2 - c.Y[c.circ_idx.m1,1].^2 + c.Y[:,2].^2 - c.Y[c.circ_idx.m1,2].^2) ./ (c.Y[:,2]-c.Y[c.circ_idx.m1,2])) ./ ((c.Y[:,1] - c.Y[c.circ_idx.m1,1])./(c.Y[:,2] - c.Y[c.circ_idx.m1,2]) - (c.Y[c.circ_idx.p1,1] - c.Y[:,1])./(c.Y[c.circ_idx.p1,2] - c.Y[:,2]))
-
-    yc = -(c.Y[:,1] - c.Y[c.circ_idx.m1,1])./(c.Y[:,2] - c.Y[c.circ_idx.m1,2]) .* xc + 0.5*(c.Y[:,1].^2 - c.Y[c.circ_idx.m1,1].^2 + c.Y[:,2].^2 - c.Y[c.circ_idx.m1,2].^2) ./ (c.Y[:,2]-c.Y[c.circ_idx.m1,2])
-    radius = sqrt.((xc - c.Y[:,1]).^2 + (yc - c.Y[:,2]).^2)
-    c.k[:] = 1 ./radius
-    c.k[:] = 0.5*(c.k + c.k[c.circ_idx.m1])
-
+    compute_curvature(c)
     c.η[:] = log.(c.r)
     c.L = sum(c.r)
 end
