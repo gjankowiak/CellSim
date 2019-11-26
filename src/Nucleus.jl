@@ -453,7 +453,7 @@ end
 
 function update_coords(c::NucleusCoords, new_c::NucleusCoords,
                        potentials::CSC.InteractionPotentials,
-                       P::Params, F::Flags, temparrays::CSC.TempArrays6, iter::Int64)
+                       P::Params, F::Flags, temparrays::CSC.TempArrays6, recompute::Bool)
 
     N_W = potentials.N_W
     N_∇W = potentials.N_∇W
@@ -471,7 +471,7 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     update_θ(c, new_c, N_W, N_∇W, P, F, temparrays)
     update_Y(c, new_c, N_W, N_∇W, P, F, temparrays)
 
-    if iter%5 == 0
+    if recompute
         recompute_nucleus_coords(new_c)
     end
 

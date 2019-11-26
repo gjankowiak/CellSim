@@ -461,8 +461,8 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
             if F.centrosome
                 Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
             end
-            Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays, k)
-
+            recompute = (k % config["recompute_nucleus_each"] == 0)
+            Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays, recompute)
         end
 
         if F.cortex
