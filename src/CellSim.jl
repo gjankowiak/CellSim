@@ -536,6 +536,10 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         Plotting.plot_metrics(metrics)
     end
 
+    if get(config, "batch", false)
+        Plotting.close()
+    end
+
     return
 end
 
