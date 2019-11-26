@@ -195,6 +195,10 @@ function read_config(config_filename::String)
         config["output_prefix"] = "runs/"
     end
 
+    if !haskey(config, "recompute_nucleus_coords")
+        config["recompute_nucleus_coords"] = 5
+    end
+
     if (config["metrics"]["start_iteration"] <= 0) && !F.nucleus
         println("[WARNING] metrics.start_iteration is non-positive and nucleus is deactivated, metrics will never start!")
     end
@@ -457,7 +461,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
             if F.centrosome
                 Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
             end
-            Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays)
+            Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays, k)
 
         end
 

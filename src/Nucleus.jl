@@ -36,7 +36,7 @@ mutable struct NucleusCoords
     # normal vector
     n::Matrix{Float64}
 
-    # local length element
+    # local length element, i.e. log(r)
     η::Vector{Float64}
 
     # nuclear membrane length
@@ -68,6 +68,28 @@ end
 
 function g_p(x::Vector{Float64}, α::Float64)
     return -(2α*min.(α*x.-1, 0.0).*log.(α*x) .+ min.(α*x.-1, 0.0).^2 ./x)
+end
+
+function recompute_nucleus_coords(c::NucleusCoords)
+    delta_Y = c.Y - c.Y[c.circ_idx.m1,:]
+    c.r[:] = sqrt.(sum(abs2, delta_Y; dims=2))
+    c.q[:] = 0.5*(c.r + c.r[c.circ_idx.p1])
+
+    c.θ[:] = angle.(delta_Y[:,1] + delta_Y[:,2]*im)
+    delta_θ = rem.(c.θ - c.θ[c.circ_idx.m1], 2π, RoundNearest)
+    c.θ[:] = cumsum([c.θ[1]; delta_θ[1:end-1]])
+
+    # http://cral-labo.univ-lyon1.fr/labo/fc/Ateliers_archives/ateliers_2005-06/cercle_3pts.pdf
+    xc = (0.5*(c.Y[c.circ_idx.p1,1].^2 - c.Y[:,1].^2 + c.Y[c.circ_idx.p1,2].^2 - c.Y[:,2].^2) ./ (c.Y[c.circ_idx.p1,2]-c.Y[:,2])
+          - 0.5*(c.Y[:,1].^2 - c.Y[c.circ_idx.m1,1].^2 + c.Y[:,2].^2 - c.Y[c.circ_idx.m1,2].^2) ./ (c.Y[:,2]-c.Y[c.circ_idx.m1,2])) ./ ((c.Y[:,1] - c.Y[c.circ_idx.m1,1])./(c.Y[:,2] - c.Y[c.circ_idx.m1,2]) - (c.Y[c.circ_idx.p1,1] - c.Y[:,1])./(c.Y[c.circ_idx.p1,2] - c.Y[:,2]))
+
+    yc = -(c.Y[:,1] - c.Y[c.circ_idx.m1,1])./(c.Y[:,2] - c.Y[c.circ_idx.m1,2]) .* xc + 0.5*(c.Y[:,1].^2 - c.Y[c.circ_idx.m1,1].^2 + c.Y[:,2].^2 - c.Y[c.circ_idx.m1,2].^2) ./ (c.Y[:,2]-c.Y[c.circ_idx.m1,2])
+    radius = sqrt.((xc - c.Y[:,1]).^2 + (yc - c.Y[:,2]).^2)
+    c.k[:] = 1 ./radius
+    c.k[:] = 0.5*(c.k + c.k[c.circ_idx.m1])
+
+    c.η[:] = log.(c.r)
+    c.L = sum(c.r)
 end
 
 function compute_contact_force(pots::CSC.InteractionPotentials,
@@ -352,10 +374,10 @@ function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords; fill_wall
     # The nucleus is initialized as a circle centered on the
     # barycenter of the cell, with radius P.N_r_init
 
-    t = collect(range(0, stop=2pi, length=P.Nnuc+1))[1:P.Nnuc]
+    t = collect(range(-0.5pi, stop=1.5pi, length=P.Nnuc+1))[1:P.Nnuc]
 
-    θ0 = π/P.Nnuc
-    θ = collect(π/2 + θ0 .+ (-1:(P.Nnuc-2))*2*θ0)
+    θ0 = 2π/P.Nnuc
+    θ = collect(-0.5*θ0 .+ (0:(P.Nnuc-1))*θ0)
 
     if fill_wall
         bc = [0.0 0.5π/P.f_ω0]
@@ -384,7 +406,7 @@ end
 
 function update_coords(c::NucleusCoords, new_c::NucleusCoords,
                        potentials::CSC.InteractionPotentials,
-                       P::Params, F::Flags, temparrays::CSC.TempArrays6)
+                       P::Params, F::Flags, temparrays::CSC.TempArrays6, iter::Int64)
 
     N_W = potentials.N_W
     N_∇W = potentials.N_∇W
@@ -401,6 +423,10 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     update_K(c, new_c, N_W, N_∇W, P, F, temparrays)
     update_θ(c, new_c, N_W, N_∇W, P, F, temparrays)
     update_Y(c, new_c, N_W, N_∇W, P, F, temparrays)
+
+    if iter%5 == 0
+        recompute_nucleus_coords(new_c)
+    end
 
     if F.DEBUG
         println("POST alpha, beta, r, q, K, θ")
