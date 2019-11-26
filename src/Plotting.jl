@@ -40,10 +40,10 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 
     if F.nucleus
         # Nucleus
-        ax.plot(zeros(P.Nnuc), zeros(P.Nnuc), color="yellow", zorder=16)
+        ax.plot(zeros(P.Nnuc), zeros(P.Nnuc), ".-", color="yellow", zorder=16)
 
         # Nucleus fillin
-        ax.fill(zeros(P.Nnuc), zeros(P.Nnuc), color="yellow", zorder=16)[1]
+        ax.fill(zeros(P.Nnuc), zeros(P.Nnuc), color="xkcd:light yellow", zorder=16)[1]
 
         # Normals
         # ax.quiver(zeros(P.Nnuc), zeros(P.Nnuc),
