@@ -111,6 +111,7 @@ mutable struct Flags
     pretty::Bool
     landscape_plot::Bool
     follow_cam::Bool
+    follow_nucleus::Bool
     plot_drag::Bool
 
     # output options

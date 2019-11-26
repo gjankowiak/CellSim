@@ -228,22 +228,22 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
     # scatters[idx_s].set_color(colors)
     # idx_s += 1
 
-    lims = ax.get_ylim()
-
-    x_min, x_max = minimum(x[:,2]), maximum(x[:,2])
-    x_mid = 0.5(x_max+x_min)
 
     if F.follow_cam
-        lims = ax.get_xlim()
-        x_min, x_max = minimum(x[:,1]), maximum(x[:,1])
+        if F.follow_nucleus
+            follow_x = nucleus_coords.Y
+        else
+            follow_x = coords.x
+        end
+        x_min, x_max = minimum(follow_x[:,1]), maximum(follow_x[:,1])
+        y_min, y_max = minimum(follow_x[:,2]), maximum(follow_x[:,2])
         x_mid = 0.5(x_max+x_min)
         x_span = (x_max-x_min)
-        y_min, y_max = minimum(x[:,2]), maximum(x[:,2])
         y_mid = 0.5(y_max+y_min)
         y_span = (y_max-y_min)
 
-        ax.set_xlim((x_mid-x_span, x_mid+x_span))
-        ax.set_ylim((y_mid-y_span, y_mid+y_span))
+        ax.set_xlim((x_mid-0.7*x_span, x_mid+0.7*x_span))
+        ax.set_ylim((y_mid-0.7*y_span, y_mid+0.7*y_span))
     end
 
     # if F.plot_drag

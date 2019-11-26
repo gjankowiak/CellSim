@@ -172,6 +172,7 @@ function read_config(config_filename::String)
           y_flags["pretty"],
           y_flags["landscape_plot"],
           y_flags["follow_cam"],
+          get(y_flags, "follow_nucleus", false)
           y_flags["plot_drag"],
 
           # output options
