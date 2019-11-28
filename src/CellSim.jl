@@ -195,8 +195,8 @@ function read_config(config_filename::String)
         config["output_prefix"] = "runs/"
     end
 
-    if !haskey(config, "recompute_nucleus_coords")
-        config["recompute_nucleus_coords"] = 5
+    if !haskey(config, "recompute_nucleus_each")
+        config["recompute_nucleus_each"] = 5
     end
 
     if (config["metrics"]["start_iteration"] <= 0) && !F.nucleus
@@ -219,9 +219,9 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         config["output_prefix"] = "runs/"
     end
 
-    run(`mkdir -p runs`)
-    run(`mkdir -p dumps`)
-    run(`mkdir -p $(config["output_prefix"])`)
+    mkpath("runs")
+    mkpath("dumps")
+    mkpath("$(config["output_prefix"])")
     run(`cp $(config["config_filename"]) $(config["output_prefix"])Run_$(config["date_string"]).yaml`)
     println("Parameters:")
     for s in fieldnames(typeof(P))
