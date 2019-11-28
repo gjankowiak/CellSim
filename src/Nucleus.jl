@@ -11,6 +11,8 @@ const SA = SparseArrays
 import LinearAlgebra
 const LA = LinearAlgebra
 
+import NLsolve
+
 mutable struct NucleusCoords
     # node coordinates
     Y::Matrix{Float64}
@@ -417,6 +419,27 @@ function update_Y(c::NucleusCoords, new_c::NucleusCoords,
     new_c.Y[:] = M\f
 end
 
+function min_center_to_wall(P::Params)
+
+    function dist(x)
+        return sqrt((x-0.5π/P.f_ω0)^2 + (P.f_width + P.f_β*sin(P.f_ω0*x))^2)
+    end
+
+    function f(x)
+        return [x[1] - 0.5π/P.f_ω0 + P.f_ω0*P.f_β*cos(P.f_ω0*x[1])*(P.f_width + P.f_β*sin(P.f_ω0*x[1]))]
+    end
+
+    function fprime(x)
+        return [1 + (P.f_ω0*P.f_β)^2*(cos(P.f_ω0*x[1])^2 - sin(P.f_ω0*x[1])^2) - P.f_β*P.f_ω0^2*P.f_width*sin(P.f_ω0*x[1])]
+    end
+
+    res = NLsolve.nlsolve(f, fprime, [π/P.f_ω0])
+
+    @assert fprime(res.zero)[1] > 0
+
+    return dist(res.zero[1])
+end
+
 function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords; fill_wall::Bool=true)
     # The nucleus is initialized as a circle centered on the
     # barycenter of the cell, with radius P.N_r_init
@@ -427,15 +450,15 @@ function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords; fill_wall
     θ = collect(-0.5*θ0 .+ (0:(P.Nnuc-1))*θ0)
 
     if fill_wall
-        bc = [0.0 0.5π/P.f_ω0]
-        r_init = min(P.f_width + P.f_β - 2/P.f_α, (0.5π + P.f_width)/P.f_ω0)
+        nucleus_center = [0.0 0.5π/P.f_ω0]
+        r_init = min_center_to_wall(P) - 2/P.f_α
     else
-        bc = sum(cortex_c.x; dims=1) / P.N
+        nucleus_center = sum(cortex_c.x; dims=1) / P.N
         r_init = P.N_r_init
     end
 
     nc = NucleusCoords(
-        r_init*[cos.(t) sin.(t)] .+ bc, # Y
+        r_init*[cos.(t) sin.(t)] .+ nucleus_center, # Y
         zeros(P.Nnuc), # α
         zeros(P.Nnuc), # β
         1/r_init * ones(P.Nnuc), # k
