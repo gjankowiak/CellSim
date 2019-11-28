@@ -4,11 +4,10 @@ import CellSim
 import Dates
 
 # The configuration file from which parameters are taken
-base_config = "configs_metrics/no_nucleus/varia_width_param.yaml"
+base_config = "configs_metrics/no_nucleus/varia_beta_param.yaml"
 
 # The output prefix, this overrides the one set in the configuration file
 output_prefix = "nonuc_beta"
-
 
 # Load configuration
 P, F, config = CellSim.read_config(base_config)
