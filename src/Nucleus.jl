@@ -437,7 +437,7 @@ function min_center_to_wall(P::Params)
 
     @assert fprime(res.zero)[1] > 0
 
-    return dist(res.zero[1])
+    return min(dist(res.zero[1]), π/P.f_ω0)
 end
 
 function initialize_coords(P::Params, F::Flags, cortex_c::PointCoords; fill_wall::Bool=true)
