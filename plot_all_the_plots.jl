@@ -67,17 +67,18 @@ PyPlot.title("Velocity vs kMT")
 
 # channel depth
 PyPlot.subplot(245)
-plot_csv("plot_data/before_recompute_nucleus/v_beta_nuc_old.csv", true, label="nuc old")
-plot_csv("plot_data/before_recompute_nucleus/v_beta_nuc_new.csv", true, label="nuc new")
-plot_csv("plot_data/before_recompute_nucleus/v_beta_nonuc.csv", false, label="nonuc", ls="dotted")
+plot_csv("plot_data/v_beta_nuc.csv", true, label="nuc")
+plot_csv("plot_data/v_beta_nonuc.csv", true, label="nonuc")
+# plot_csv("plot_data/before_recompute_nucleus/v_beta_nuc_new.csv", true, label="nuc new")
+# plot_csv("plot_data/before_recompute_nucleus/v_beta_nonuc.csv", false, label="nonuc", ls="dotted")
 PyPlot.axhline(0.0, lw=0.5, color="black")
 PyPlot.legend()
 PyPlot.title("Velocity vs f_β")
 
 # channel width
 PyPlot.subplot(246)
-plot_csv("plot_data/before_recompute_nucleus/v_width_nuc_old.csv", true, label="nuc old")
-plot_csv("plot_data/before_recompute_nucleus/v_width_nuc_new.csv", true, label="nuc new")
+plot_csv("plot_data/v_width_nuc.csv", true, label="nuc")
+# plot_csv("plot_data/before_recompute_nucleus/v_width_nuc_new.csv", true, label="nuc old")
 plot_csv("plot_data/before_recompute_nucleus/v_width_nonuc.csv", false, label="nonuc", ls="dotted")
 PyPlot.axhline(0.0, lw=0.5, color="black")
 PyPlot.legend()
@@ -85,7 +86,7 @@ PyPlot.title("Velocity vs f_width")
 
 # channel pulsation
 PyPlot.subplot(247)
-plot_csv("plot_data/before_recompute_nucleus/v_omega_nuc_old.csv", true, label="nuc old")
+plot_csv("plot_data/v_omega_nonuc.csv", true, label="nonuc")
 plot_csv("plot_data/v_omega_nuc.csv", true, label="nuc")
 PyPlot.axhline(0.0, lw=0.5, color="black")
 PyPlot.legend()

@@ -4,10 +4,10 @@ import CellSim
 import Dates
 
 # The configuration file from which parameters are taken
-base_config = "configs_metrics/no_nucleus/varia_width_param.yaml"
+base_config = "configs_metrics/nucleus/varia_omega_param.yaml"
 
 # The output prefix, this overrides the one set in the configuration file
-output_prefix = "nonuc_width"
+output_prefix = "nuc_omega"
 
 # Load configuration
 P, F, config = CellSim.read_config(base_config)
@@ -27,21 +27,20 @@ config["batch"] = true
 parameter_log_file = string(output_prefix, "/parameter_log.txt")
 
 # Open the log file and write the date on top
-# If it already exists, we do not delete it, but write at the end
 param_log = open(parameter_log_file, "a")
 date = string(Dates.now())
 write(param_log, string("\n", date, "\n\n"))
 
 # The range in which the varying parameter is taken
-ws = range(0.3, 0.8; length=20)
+omegas = collect(range(2.0, 12.0; length=11))
 
 # Loop
-for w in ws
+for omega in omegas
     # Set the parameter value
-    P.f_width = w
+    P.f_ω0 = omega
 
     # Write the current value to the log file
-    write(param_log, string(w, "\n"))
+    write(param_log, string(omega, "\n"))
 
     # Run the simulation
     CellSim.launch(P, F, config)

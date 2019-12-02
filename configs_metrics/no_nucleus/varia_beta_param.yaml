@@ -1,6 +1,6 @@
 params:
     N: 250 # number of points
-    M: 20000 # max. number of iterations
+    M: 80000 # max. number of iterations
 
     δt: 2e-4 # time step
 
@@ -93,5 +93,3 @@ config:
         filename_centro: "initial_conditions/torino_width_1_centro.csv"
 
         # shift_nucleus: 0.25 # 3/4 of a period = 3/4 * 2π / f.ω0
-
-   

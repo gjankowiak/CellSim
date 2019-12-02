@@ -40,7 +40,7 @@ for beta in betas
     P.f_β = beta
 
     # Write the current value to the log file
-    write(param_log, beta)
+    write(param_log, string(beta, "\n"))
 
     # Run the simulation
     CellSim.launch(P, F, config)

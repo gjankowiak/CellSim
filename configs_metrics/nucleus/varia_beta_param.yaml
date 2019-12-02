@@ -44,7 +44,7 @@ params:
     N_mu: 100 # area constraint relaxation
     N_target_area: 0.7
     N_kb: 5e-4 # bending stiffness
-    N_ω:  1e-1 # inplane stiffness
+    N_ω:  5e1 # inplane stiffness
     N_W0: 7e-1  # potential offset
     N_kcont: 5e0 # contact force intensity
     N_αcont: 1e1 # contact force sharpness
