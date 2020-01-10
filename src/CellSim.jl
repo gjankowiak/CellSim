@@ -163,6 +163,7 @@ function read_config(config_filename::String)
           y_flags["nucleus"],
           y_flags["weighted_confinement"],
           y_flags["force_cortex_area"],
+          get(y_flags, "explicit_mt_force", false),
 
           # scheme/solver options
           y_flags["innerloop"],

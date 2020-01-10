@@ -261,21 +261,25 @@ function assemble_system(P::CSC.Params, F::CSC.Flags,
     # = -k ∫ |X(s)-Xc^(-(α+1)) [ (α+1)|X(s)-Xc|^-¹ (X(s)-Xc)⊗(X(s)-Xc) - I₂ ] δXc |Π_MT^-¹'| ds
 
     # |X(s) - Xc|
-    norm_nodes = abs.(CSC.@entry_norm(vr.nodes[1:vr.n,:]))
+    if !F.explicit_mt_force
+        norm_nodes = abs.(CSC.@entry_norm(vr.nodes[1:vr.n,:]))
 
-    diff_mt_force_col_1 = -k*norm_nodes[1:vr.n,:].^p .* (((-p).*vr.nodes[1:vr.n,1].*vr.nodes[1:vr.n,:]./norm_nodes[1:vr.n,:]
-                                                                 - repeat([1 0], vr.n))
-                                                                + (2 ./norm_nodes[1:vr.n,:].^2 .*vr.nodes[1:vr.n,1]) .* vr.nodes[1:vr.n,:])
-    diff_mt_force_col_2 = -k*norm_nodes[1:vr.n,:].^p .* (((-p).*vr.nodes[1:vr.n,2].*vr.nodes[1:vr.n,:]./norm_nodes[1:vr.n,:]
-                                                                 - repeat([0 1], vr.n))
-                                                                + (2 ./norm_nodes[1:vr.n,:].^2 .*vr.nodes[1:vr.n,2]) .* vr.nodes[1:vr.n,:])
+        diff_mt_force_col_1 = -k*norm_nodes[1:vr.n,:].^p .* (((-p).*vr.nodes[1:vr.n,1].*vr.nodes[1:vr.n,:]./norm_nodes[1:vr.n,:]
+                                                                     - repeat([1 0], vr.n))
+                                                                    + (2 ./norm_nodes[1:vr.n,:].^2 .*vr.nodes[1:vr.n,1]) .* vr.nodes[1:vr.n,:])
+        diff_mt_force_col_2 = -k*norm_nodes[1:vr.n,:].^p .* (((-p).*vr.nodes[1:vr.n,2].*vr.nodes[1:vr.n,:]./norm_nodes[1:vr.n,:]
+                                                                     - repeat([0 1], vr.n))
+                                                                    + (2 ./norm_nodes[1:vr.n,:].^2 .*vr.nodes[1:vr.n,2]) .* vr.nodes[1:vr.n,:])
+    end
 
     # ∫ F_MT
     b_ce_n[1:2] = integrate_θ(plotables.mt_force_indiv, qw, vr)
 
     # ∫ F_MT'
-    A[1:2,1] += -vec(P.δt*integrate_θ(diff_mt_force_col_1, qw, vr))
-    A[1:2,2] += -vec(P.δt*integrate_θ(diff_mt_force_col_2, qw, vr))
+    if !F.explicit_mt_force
+        A[1:2,1] += -vec(P.δt*integrate_θ(diff_mt_force_col_1, qw, vr))
+        A[1:2,2] += -vec(P.δt*integrate_θ(diff_mt_force_col_2, qw, vr))
+    end
 
     #  - k_MT ∫ ds/dt ∂_s Xθ^n
     b_ce_n[1:2] +=  - P.k_MT*reshape(integrate_θ(vr.M_inter*reshape(plotables.transport_force, P.N, 2), qw, vr), 2, 1)

@@ -102,6 +102,7 @@ mutable struct Flags
     nucleus::Bool
     weighted_confinement::Bool
     force_cortex_area::Bool
+    explicit_mt_force::Bool
 
     # scheme/solver options
     innerloop::Bool
