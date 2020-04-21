@@ -124,6 +124,10 @@ mutable struct Flags
     DEBUG::Bool
 end
 
+function to_dict(s::Union{Params,Flags})
+    return Dict([(String(field), getfield(s, field)) for field in fieldnames(typeof(s))])
+end
+
 struct InteractionPotentials
     N_W::Vector{Float64}
     N_∇W::Matrix{Float64}
@@ -291,7 +295,7 @@ end
 """
 function pointwise_dot_prod(v)
     N = size(v, 1)
-    return [v[:, 1].*SA.sparse(SA.I, N, N) v[:,2].*SA.sparse(SA.I, N, N)]
+    return [v[:, 1].*SA.sparse(1.0*SA.I, N, N) v[:,2].*SA.sparse(1.0*SA.I, N, N)]
 end
 
 """

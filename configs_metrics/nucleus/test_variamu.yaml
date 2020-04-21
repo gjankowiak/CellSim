@@ -73,11 +73,14 @@ flags:
     debug:                false
     force_cortex_area:    true
     write_metrics:        true
+    explicit_mt_force:    false
 
 config:
     output_prefix: test_variamu60
 
     plot_period: 20
+
+    recompute_nucleus_each: 5
 
     metrics:
         start_iteration: 1

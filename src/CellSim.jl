@@ -25,6 +25,10 @@ import NLsolve
 import YAML
 import Dates
 
+# we need python's YAML to dump config files
+import PyCall
+const pyyaml = PyCall.pyimport("yaml")
+
 import DelimitedFiles: readdlm, writedlm
 
 import SparseArrays
@@ -223,7 +227,10 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
     mkpath("runs")
     mkpath("dumps")
     mkpath("$(config["output_prefix"])")
-    run(`cp $(config["config_filename"]) $(config["output_prefix"])Run_$(config["date_string"]).yaml`)
+    config_dict = Dict([("params", CSC.to_dict(P)), ("flags", CSC.to_dict(F)), ("config", config)])
+    output_config_file = open(config["output_prefix"] * "Run_" * config["date_string"] * ".yaml", "w")
+    pyyaml.dump(config_dict, output_config_file, allow_unicode=true)
+    close(output_config_file)
     println("Parameters:")
     for s in fieldnames(typeof(P))
         println(string("    ", s, ": ", getfield(P, s)))
@@ -367,6 +374,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
 
 
     stepping = F.DEBUG
+    breakpoint = -1
     if !stepping
         input_task = @async read(stdin, Char)
     end
@@ -383,11 +391,19 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
             break
         end
 
+        if k == breakpoint
+            stepping = true
+        end
+
         if stepping
-            println("debug: 'q' to quit, 'c' to run continuously, any other key to step, 'b' to run step by step")
+            println("debug: 'q' to quit, 'c' to run continuously, 'C' to continue to ITER, any other key to step, 'b' to run step by step")
             key = read(stdin, 1)[1]
             if key == 0x63 # c
                 stepping = false
+                input_task = @async read(stdin, Char)
+            elseif key == 0x43 # C
+                stepping = false
+                breakpoint = parse(Int, readline())
                 input_task = @async read(stdin, Char)
             elseif key == 0x71 # q
                 break

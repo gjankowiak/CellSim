@@ -204,7 +204,7 @@ function init_FD_matrices(P::Params)
     N = P.N
     Δσ = P.Δσ
 
-    global M_perp = SA.blockdiag(-SA.sparse(SA.I, N, N), SA.sparse(SA.I, N, N))
+    global M_perp = SA.blockdiag(-SA.sparse(1.0*SA.I, N, N), SA.sparse(1.0*SA.I, N, N))
     global M_cs_plus = SA.spdiagm(-N+1 => [1; zeros(N-1); 1],
                                    1 => [ones(N-1); 0; ones(N-1)])
     global M_cs_minus = SA.spdiagm(N-1 => [1; zeros(N-1); 1],
@@ -716,7 +716,7 @@ function compute_residuals_J(x::Vector{Float64},
                                 differentials, dst_Df, true)
     end
 
-    dst_Df[:] = SA.sparse(SA.I, 2P.N, 2P.N) .- P.δt*dst_Df
+    dst_Df[:] = SA.sparse(1.0*SA.I, 2P.N, 2P.N) .- P.δt*dst_Df
 end
 
 function wrap_residuals(coords::PointCoords, coords_s::PointCoordsShifted,

@@ -22,7 +22,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 
     x = coords.x
 
-    fig = PyPlot.figure(figsize=(12.8, 10))
+    fig = PyPlot.figure(figsize=(12.8, 10), dpi=50)
 
     PyPlot.show()
     # figManager = PyPlot.get_current_fig_manager()
@@ -36,7 +36,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
     ax.plot(x[:,1], x[:,2], ".-", zorder=20)[1]
 
     # Cortex fillin
-    ax.fill(x[:,1], x[:,2], color="#f713e0", zorder=10)[1]
+    ax.fill(x[:,1], x[:,2], color="#f713e033", zorder=10)[1]
 
     if F.nucleus
         # Nucleus
@@ -54,7 +54,9 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
     end
 
     # Drag force
-    # ax.scatter(x[:,1], x[:,2], color="black", zorder=30)
+    if F.plot_drag
+        ax.scatter(x[:,1], x[:,2], color="black", zorder=30)
+    end
 
     # Initial condition
     # ax.plot(x[:,1], x[:,2], color="black", lw=0.5, zorder=1)[1]
@@ -182,8 +184,11 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
     end
 
     # Drag force
-    # scatters[idx_s].set_offsets(x)
-    # idx_s += 1
+    if F.plot_drag
+        scatters[idx_s].set_sizes(10CellSimCommon.@entry_norm(plotables.drag_force))
+        scatters[idx_s].set_offsets(x)
+        idx_s += 1
+    end
 
     # Initial condition
     # idx_l += 1
@@ -230,7 +235,7 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
 
 
     if F.follow_cam
-        if F.follow_nucleus
+        if F.nucleus && F.follow_nucleus
             follow_x = nucleus_coords.Y
         else
             follow_x = coords.x
@@ -245,14 +250,6 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
         ax.set_xlim((x_mid-0.7*x_span, x_mid+0.7*x_span))
         ax.set_ylim((y_mid-0.7*y_span, y_mid+0.7*y_span))
     end
-
-    # if F.plot_drag
-        # scatters[1].set_sizes(10CellSimCommon.@entry_norm(plotables.drag_force))
-    # else
-        # scatters[1].set_sizes(0CellSimCommon.@entry_norm(plotables.drag_force))
-    # end
-    # scatters[1].set_facecolor(JankoUtils.scale_cm(plotables.mass_source, PyPlot.get_cmap("RdYlGn");
-                                               # range_min=-P.c, range_max=P.c))
 
     PyPlot.draw()
     sleep(0.001)
