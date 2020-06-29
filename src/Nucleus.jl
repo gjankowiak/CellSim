@@ -89,6 +89,8 @@ function compute_curvature_4(c::NucleusCoords, sign_k::Vector{Float64})
 
     Nnuc = size(c.Y, 1)
 
+    k = zeros(Nnuc)
+
     for i in 1:Nnuc
         A[1,1] = 8*( c.Y[c.circ_idx.m2[i],1]^2
                     +c.Y[c.circ_idx.m1[i],1]^2
@@ -134,8 +136,11 @@ function compute_curvature_4(c::NucleusCoords, sign_k::Vector{Float64})
         b[3] = -0.25*(A[1,1] + A[2,2])
 
         x = A\b
-        c.k[i] = sign_k[i]./sqrt(x[1]^2 + x[2]^2 - x[3])
+        k[i] = sign_k[i]./sqrt(x[1]^2 + x[2]^2 - x[3])
     end
+
+    rel_change = abs.(k - c.k)./abs.(c.k) .< 1.0
+    c.k[rel_change] = k[rel_change]
 end
 
 function recompute_nucleus_coords(c::NucleusCoords)
@@ -147,8 +152,9 @@ function recompute_nucleus_coords(c::NucleusCoords)
     delta_θ = rem.(c.θ - c.θ[c.circ_idx.m1], 2π, RoundNearest)
     c.θ[:] = cumsum([c.θ[1]; delta_θ[1:end-1]])
 
-    sign_k = [sign(c.θ[1] + 2π - c.θ[end]); sign.(delta_θ)]
+    sign_k = sign.(delta_θ)
 
+    # compute_curvature_3(c, sign_k)
     compute_curvature_4(c, sign_k)
     c.η[:] = log.(c.r)
     c.L = sum(c.r)
@@ -494,7 +500,7 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     N_W = potentials.N_W
     N_∇W = potentials.N_∇W
 
-    if F.DEBUG
+    if F.debug
         println("PRE alpha, beta, r, q, K, θ")
         # display([c.α c.β c.r c.q c.k c.θ])
         display([sum(c.α)/P.Nnuc sum(c.β)/P.Nnuc sum(c.r)/P.Nnuc sum(c.q)/P.Nnuc sum(c.k)/P.Nnuc sum(c.θ)/P.Nnuc])
@@ -507,7 +513,7 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
     update_θ(c, new_c, N_W, N_∇W, P, F, temparrays)
     update_Y(c, new_c, N_W, N_∇W, P, F, temparrays)
 
-    if F.DEBUG & recompute
+    if F.debug & recompute
         println("PRE recompute alpha, beta, r, q, K, θ")
         # display([c.α c.β c.r c.q c.k c.θ])
         display([sum(new_c.α)/P.Nnuc sum(new_c.β)/P.Nnuc sum(new_c.r)/P.Nnuc sum(new_c.q)/P.Nnuc sum(new_c.k)/P.Nnuc sum(new_c.θ)/P.Nnuc])
@@ -520,12 +526,12 @@ function update_coords(c::NucleusCoords, new_c::NucleusCoords,
         recompute_nucleus_coords(new_c)
     end
 
-    if F.DEBUG & recompute
+    if F.debug & recompute
         print("kpost = ")
         println(new_c.k)
     end
 
-    if F.DEBUG
+    if F.debug
         println("POST alpha, beta, r, q, K, θ")
         # display([new_c.α new_c.β new_c.r new_c.q new_c.k new_c.θ])
         display([sum(new_c.α)/P.Nnuc sum(new_c.β)/P.Nnuc sum(new_c.r)/P.Nnuc sum(new_c.q)/P.Nnuc sum(new_c.k)/P.Nnuc sum(new_c.θ)/P.Nnuc])

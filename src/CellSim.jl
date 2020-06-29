@@ -243,8 +243,8 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
     end
     println(" ")
 
-    if F.DEBUG
-        println("*** DEBUG MODE ***")
+    if F.debug
+        println("*** debug MODE ***")
     end
 
     run(`stty -icanon`)
@@ -354,7 +354,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         if haskey(config, "plot_period")
             plot_period = config["plot_period"]
         end
-        plot_period = F.DEBUG ? 1 : 10
+        plot_period = F.debug ? 1 : 10
         fig = Plotting.init_plot(coords, P, F)
         Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
         if F.write_animation
@@ -373,7 +373,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
     metrics_started = false
 
 
-    stepping = F.DEBUG
+    stepping = F.debug
     breakpoint = -1
     if !stepping
         input_task = @async read(stdin, Char)
@@ -453,6 +453,10 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
                     end
                 elseif maximum(coords.x[:,2]) >= post_init_target_max_y
                     metrics_started = true
+                elseif k == P.M/4 # wait for max 20k iteration if P.M = 80k
+                    println()
+                    println("Initialization not finished after " * string(round(Int, P.M/4)) * " iterations, aborting this run")
+                    break
                 end
             if metrics_started
                 metrics = Metrics.init_metrics(k, P, F, config, coords, nucleus_coords)
@@ -525,7 +529,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         end
 
         # plot
-        if (F.plot && (k % plot_period == 0))
+        if (F.plot && ((k % plot_period == 0) || stepping))
             Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
             if F.write_animation
                 writer.grab_frame()

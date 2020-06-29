@@ -121,7 +121,7 @@ mutable struct Flags
     write_metrics::Bool
 
     # debug
-    DEBUG::Bool
+    debug::Bool
 end
 
 function to_dict(s::Union{Params,Flags})
