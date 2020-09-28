@@ -31,6 +31,15 @@ function init_circ_idx(N::Int64)
              circshift(1:N, -1), circshift(1:N, -2))
 end
 
+mutable struct SolverParams
+    δt::Float64
+    max_δt::Float64
+    min_δt::Float64
+    stepping_factor::Float64
+    step_up_error::Float64
+    step_down_error::Float64
+end
+
 mutable struct Params
     M::Int64      # max. number of iterations
 

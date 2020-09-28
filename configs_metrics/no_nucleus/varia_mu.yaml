@@ -64,7 +64,7 @@ flags:
     weighted_confinement: true
     write_animation:      true
     landscape_plot:       false
-    plot_drag:            true
+    plot_drag:            false
     circular_wall:        false
     cortex:               true
     centrosome:           true
@@ -73,6 +73,7 @@ flags:
     debug:                false
     force_cortex_area:    true
     write_metrics:        true
+    explicit_mt_force:    false
 
 config:
     output_prefix: nonuc_variamu

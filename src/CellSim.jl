@@ -277,6 +277,16 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
 
 
     x = copy(x_init)
+    x_candidate = copy(x_init)
+
+    solver_params = CSC.SolverParams(
+            P.δt, # current time step
+            1e-3, # maximum time step
+            1e-6, # minimum time step
+            1.4,  # stepping factor
+            1e-4,  # step up error
+            1e-2  # step down error
+    )
 
     Cortex.init_FD_matrices(P)
     coords, coords_s = Cortex.new_PointCoords(x, P)
@@ -337,6 +347,9 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         centro_vr = missing
     end
 
+    centro_x_candidate = copy(coords.centro_x)
+    centro_angle_candidate = copy(coords.centro_angle)
+
     resi, resi_J = Cortex.wrap_residuals(coords, coords_s, potentials, P, F, plotables)
     if F.innerloop
         resi_solver = NLsolve.DifferentiableSparseMultivariateFunction(resi, resi_J)
@@ -365,13 +378,13 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
 
     k = 0
     prev_height = 0.0
+    current_time = 0
 
     metrics = Dict{String, Float64}()
     post_init_periods = get(config["metrics"], "post_init_periods", 0)
     metrics_pre_init_done = false
     post_init_target_max_y = Inf
     metrics_started = false
-
 
     stepping = F.debug
     breakpoint = -1
@@ -467,48 +480,84 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         end
 
 
-        try
+        # try
         # inner loop
         if k > 1
             Cortex.update_coords(coords, P, x)
         end
 
-        if F.nucleus
-            fill!(potentials.N_W, 0.0)
-            fill!(potentials.N_∇W, 0.0)
-            fill!(potentials.C_∇W, 0.0)
-            fill!(potentials.CS_∇W, 0.0)
-            Nucleus.compute_contact_force(potentials, coords, nucleus_coords, P, F)
-            if F.centrosome
-                Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
+        decreasing_step = false
+
+        while true
+            # adaptive
+
+            if F.nucleus
+                fill!(potentials.N_W, 0.0)
+                fill!(potentials.N_∇W, 0.0)
+                fill!(potentials.C_∇W, 0.0)
+                fill!(potentials.CS_∇W, 0.0)
+                Nucleus.compute_contact_force(potentials, coords, nucleus_coords, P, F)
+                if F.centrosome
+                    Nucleus.compute_centronuclear_force(potentials, coords, nucleus_coords, P, F)
+                end
+                recompute = (k % config["recompute_nucleus_each"] == 0)
+                Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays, recompute)
             end
-            recompute = (k % config["recompute_nucleus_each"] == 0)
-            Nucleus.update_coords(old_nucleus_coords, nucleus_coords, potentials, P, F, temparrays, recompute)
-        end
 
-        if F.cortex
-            # cortex evolution
-            resi(vec(x), r_x)
-            resi_J(vec(x), Jr_x)
-        end
+            if F.cortex
+                # cortex evolution
+                resi(vec(x), r_x)
+                resi_J(vec(x), Jr_x)
+            end
 
-        if F.centrosome
-            (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, F, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables, potentials)
-            # centrosome evolution
-            M = ([[Jr_x+centro_id_comp centro_b_ce'];[centro_b_ce centro_A]])
+            if F.centrosome
+                (centro_A, centro_id_comp, centro_b_ce, centro_b_ce_rhs, centro_b_co_rhs) = Centrosome.assemble_system(P, F, coords, centro_bufs, centro_vr, centro_qw, centro_pc, plotables, potentials)
+                # centrosome evolution
+                M = ([[Jr_x+centro_id_comp centro_b_ce'];[centro_b_ce centro_A]])
 
-            rhs = [-r_x+P.δt*centro_b_co_rhs; P.δt*centro_b_ce_rhs]
+                rhs = [-r_x+P.δt*centro_b_co_rhs; P.δt*centro_b_ce_rhs]
 
-            δx[:] = M\rhs
+                δx[:] = M\rhs
 
-            x .+= reshape(δx[1:2P.N], P.N, 2)
+                x_candidate .= x .+ reshape(δx[1:2P.N], P.N, 2)
 
-            coords.centro_x .+= δx[(2P.N+1):(2P.N+2)]
-            coords.centro_angle .+= δx[2P.N+3]
-            Centrosome.compute_vr(P, coords, centro_bufs, centro_vr)
-        else
-            δx[:] = -Jr_x\r_x
-            x .+= + reshape(δx, P.N, 2)
+                centro_x_candidate .= coords.centro_x .+ δx[(2P.N+1):(2P.N+2)]
+                centro_angle_candidate .= coords.centro_angle .+ δx[2P.N+3]
+            else
+                δx[:] = -Jr_x\r_x
+                x_candidate .= x .+ reshape(δx, P.N, 2)
+            end
+
+            max_displacement = maximum(abs.(x - x_candidate))
+            @show max_displacement
+
+            if max_displacement < solver_params.step_up_error # too small
+                if decreasing_step
+                    break
+                end
+                P.δt = min(solver_params.max_δt, P.δt * solver_params.stepping_factor)
+                println()
+                println("Time step ↑ $(P.δt)")
+                println()
+                decreasing_step = false
+            elseif max_displacement > solver_params.step_down_error # too large
+                P.δt = P.δt / solver_params.stepping_factor
+                decreasing_step = true
+                println()
+                println("Time step ↓ $(P.δt)")
+                println()
+                if P.δt < solver_params.min_δt
+                    throw("Time step became too small")
+                end
+            else # ok
+                x .= x_candidate
+                if F.centrosome
+                    coords.centro_x .= centro_x_candidate
+                    coords.centro_angle .= centro_angle_candidate
+                    Centrosome.compute_vr(P, coords, centro_bufs, centro_vr)
+                end
+                break
+            end
         end
 
         if metrics_started
@@ -521,12 +570,12 @@ function launch(P::CSC.Params, F::CSC.Flags, config)
         if F.nucleus
             Nucleus.copy(old_nucleus_coords, nucleus_coords)
         end
-        catch e
-            println()
-            println("ERROR at iteration ", k, ":")
-            println(e)
-            break
-        end
+        # catch e
+            # println()
+            # println("ERROR at iteration ", k, ":")
+            # println(e)
+            # break
+        # end
 
         # plot
         if (F.plot && ((k % plot_period == 0) || stepping))

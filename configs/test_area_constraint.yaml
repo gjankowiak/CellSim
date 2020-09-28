@@ -5,7 +5,7 @@ params:
     δt: 1e-3 # time step
 
     P: 4*6.15e-1 # pressure
-    K: 2*5e-2 # membrane elasticity
+    K: 2*5e3 # membrane elasticity
     Ka: 1 # cortex viscosity
     mu: 10 # area constraint relaxation constant
     target_area: 1 # cortex target area
