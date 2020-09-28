@@ -1,0 +1,97 @@
+params:
+    N: 250 # number of points
+    M: 80000 # max. number of iterations
+
+    δt: 2e-4 # time step
+
+    P: 4*6.15e-1 # pressure
+    K: 3e-1 # membrane elasticity
+    Ka: 1 # cortex viscosity
+    mu: 50 # area constraint relaxation constant
+    target_area: 1.8 # cortex target area
+
+    c: 1e1 # polymerization speed
+
+    x0_a: 2*0.25 # initial ellipsis width
+    x0_b: 2 # initial ellipsis height
+    x0_shift: 0.0 # initial vertical shift
+
+    # Confinement field
+
+    f_α: 2e1 # sharpness
+    f_β: 0.20 # depth
+    f_ω0: 8 # pulsation
+    f_σ: 1 # direction
+    f_nk: 1 # number of Fourier components to approximate a saw-tooth signal
+    f_width: §§W§§ # mean width
+    f_iwidth: 3.0 # inner width, unused
+
+    drag_gauss_power: 4.0 # drag_gauss_power
+    drag_gauss_width: 3.5 # drag_gauss_width
+
+    mass_gauss_power: 6.0 # mass_gauss_power
+    mass_gauss_width: 1.0 # mass_gauss_width
+
+    polar_shift: 6.0
+
+    k_MT: 1e-4              #friction of MT
+    MT_potential_power: -2
+    MT_factor: 1e-2         #strength of MT
+    #
+    # Nucleus related parameters
+    Nnuc: 200   # number of points on the nucleus
+    N_P: -1e0 # pressure
+    N_mu: 100 # area constraint relaxation
+    N_target_area: 0.7
+    N_kb: 5e-4 # bending stiffness
+    N_ω:  1e-1 # inplane stiffness
+    N_W0: 7e-1  # potential offset
+    N_kcont: 5e0 # contact force intensity
+    N_αcont: 1e1 # contact force sharpness
+    N_kc: 1e-3 # centrosome link stiffness
+    N_l0c: 5e-1 # centrosome link rest length
+    N_r_init: 2.0e-1 # initial nucleus radius
+
+flags:
+    confine:              true
+    adjust_drag:          false
+    polymerize:           true
+    dryrun:               true
+    plot:                 false
+    pretty:               false
+    continuous:           true
+    innerloop:            false
+    weighted_confinement: true
+    write_animation:      false
+    landscape_plot:       false
+    plot_drag:            true
+    circular_wall:        false
+    cortex:               true
+    centrosome:           true
+    nucleus:              false
+    follow_cam:           false
+    debug:                false
+    force_cortex_area:    true
+    write_metrics:        true
+
+config:
+    output_prefix: test_width/v2
+
+    plot_period: 20
+
+    metrics:
+        start_iteration: 1
+        post_init_periods: 1
+        periods: 2
+
+    load_state:
+        do_load: false
+        filename: "initial_conditions/torino_width_1_x.csv"
+        do_resample: false
+        do_recenter: false
+
+        init_centro: false
+        filename_centro: "initial_conditions/torino_width_1_centro.csv"
+
+        # shift_nucleus: 0.25 # 3/4 of a period = 3/4 * 2π / f.ω0
+
