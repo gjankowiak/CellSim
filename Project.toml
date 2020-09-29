@@ -1,4 +1,5 @@
 [deps]
+Conda = "8f4d0f93-b110-5947-807f-2305c1781a2d"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 EvenParam = "bcb3e14e-248c-11e9-14d9-6db38a995404"
