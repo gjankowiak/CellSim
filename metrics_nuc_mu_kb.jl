@@ -66,7 +66,7 @@ for (kb, mu) in param_range
 
     # Run the simulation
     try
-        CellSim.launch(P, F, config)
+        CellSim.launch(P, F, config; force_date_string=date)
     catch
         println("error")
     end

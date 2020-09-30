@@ -211,9 +211,14 @@ function read_config(config_filename::String)
     return P, F, config
 end
 
-function launch(P::CSC.Params, F::CSC.Flags, config)
+function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="")
 
-    date_string = string(Dates.now())
+    if length("") > 0
+        date_string = force_date_string
+    else
+        date_string = string(Dates.now())
+    end
+
     config["date_string"] = date_string
 
     if haskey(config, "output_prefix")
