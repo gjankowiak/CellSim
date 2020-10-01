@@ -385,11 +385,10 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
     prev_height = 0.0
     current_time = 0
 
-    metrics = Dict{String, Float64}()
+    metrics = Metrics.init_metrics(P, F, config)
     post_init_periods = get(config["metrics"], "post_init_periods", 0)
     metrics_pre_init_done = false
     post_init_target_max_y = Inf
-    metrics_started = false
 
     stepping = F.debug
     breakpoint = -1
@@ -402,7 +401,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
     # outer loop
     while k < P.M
         max_y = maximum(coords.x[:,2])
-        if metrics_started && (max_y >= metrics["target_max_y"])
+        if metrics["started"] && (max_y >= metrics["target_max_y"])
                 println()
                 print("Target number of periods reached, finishing...")
                 println()
@@ -452,7 +451,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
         #   Once one of previous condition is met, we then wait for the cell to cross
         #   "post_init_periods" after which we start recording metrics for "periods" periods.
         #
-        if F.write_metrics && !metrics_started
+        if F.write_metrics && !metrics["started"]
                 if !metrics_pre_init_done
                     if config["metrics"]["start_iteration"] > 0
                         if k == config["metrics"]["start_iteration"]
@@ -470,18 +469,15 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
                         println()
                     end
                 elseif maximum(coords.x[:,2]) >= post_init_target_max_y
-                    metrics_started = true
+                    Metrics.start_metrics!(metrics, k, current_time, P, F, config, coords, nucleus_coords)
+                    println()
+                    print("Starting collecting metrics, stopping when head reaches y=", metrics["target_max_y"], " (+", config["metrics"]["periods"], ")")
+                    println()
                 elseif k == P.M/4 # wait for max 20k iteration if P.M = 80k
                     println()
                     println("Initialization not finished after " * string(round(Int, P.M/4)) * " iterations, aborting this run")
                     break
                 end
-            if metrics_started
-                metrics = Metrics.init_metrics(k, P, F, config, coords, nucleus_coords)
-                println()
-                print("Starting collecting metrics, stopping when head reaches y=", metrics["target_max_y"], " (+", config["metrics"]["periods"], ")")
-                println()
-            end
         end
 
 
@@ -536,15 +532,19 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
             max_displacement = maximum(abs.(x - x_candidate))
             @show max_displacement
 
+            accept = true
+
             if max_displacement < solver_params.step_up_error # too small
                 if decreasing_step
-                    break
+                    accept = true
+                else
+                    P.δt = min(solver_params.max_δt, P.δt * solver_params.stepping_factor)
+                    println()
+                    println("Time step ↑ $(P.δt)")
+                    println()
+                    decreasing_step = false
+                    accept = false
                 end
-                P.δt = min(solver_params.max_δt, P.δt * solver_params.stepping_factor)
-                println()
-                println("Time step ↑ $(P.δt)")
-                println()
-                decreasing_step = false
             elseif max_displacement > solver_params.step_down_error # too large
                 P.δt = P.δt / solver_params.stepping_factor
                 decreasing_step = true
@@ -554,8 +554,12 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
                 if P.δt < solver_params.min_δt
                     throw("Time step became too small")
                 end
-            else # ok
+                accept = false
+            end
+
+            if accept
                 x .= x_candidate
+                current_time += P.δt
                 if F.centrosome
                     coords.centro_x .= centro_x_candidate
                     coords.centro_angle .= centro_angle_candidate
@@ -565,8 +569,8 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
             end
         end
 
-        if metrics_started
-            Metrics.update_metrics(metrics, k, P, F, config, coords, coords_s, old_coords, nucleus_coords)
+        if metrics["started"]
+            Metrics.update_metrics(metrics, k, current_time, P, F, config, coords, coords_s, old_coords, nucleus_coords)
         end
 
         if F.cortex
@@ -597,7 +601,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
         writedlm("$(config["output_prefix"])Run_$(config["date_string"])_last_centro_x.csv", coords.centro_x, ',')
     end
 
-    if F.write_metrics && metrics_started
+    if F.write_metrics
         Metrics.close_metrics(metrics, k, P)
         Metrics.save_metrics(metrics, "$(config["output_prefix"])Run_$(config["date_string"])")
     end
@@ -607,7 +611,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
     end
     println("Finished")
 
-    if F.plot && metrics_started
+    if F.plot && metrics["started"]
         Plotting.plot_metrics(metrics)
     end
 

@@ -10,15 +10,11 @@ import Nucleus
 
 import YAML
 
-function init_metrics(iter::Int64,
-                      P::CSC.Params, F::CSC.Flags, config,
-                      coords::Cortex.PointCoords,
-                      nucleus_coords::Union{Nucleus.NucleusCoords,Missing})
+function init_metrics(P::CSC.Params, F::CSC.Flags, config)
     m = Dict{String, Any}()
-    m["iter_start"] = iter
-    m["t_start"] = P.δt * iter
-    m["max_y_start"] = maximum(coords.x[:,2])
-    m["target_max_y"] = m["max_y_start"] + config["metrics"]["periods"]*2π/P.f_ω0
+
+    m["started"] = false
+    m["finished"] = false
 
     m["inst_max_y"] = Vector{Float64}()
     m["inst_velocity"] = Vector{Float64}()
@@ -44,7 +40,21 @@ function init_metrics(iter::Int64,
     return m
 end
 
-function update_metrics(m::Dict, iter::Int64,
+function start_metrics!(m::Dict, iter::Int64, t::Float64,
+                      P::CSC.Params, F::CSC.Flags, config,
+                      coords::Cortex.PointCoords,
+                      nucleus_coords::Union{Nucleus.NucleusCoords,Missing})
+
+    m["started"] = true
+    m["iter_start"] = iter
+    m["t_start"] = t
+    m["max_y_start"] = maximum(coords.x[:,2])
+    m["target_max_y"] = m["max_y_start"] + config["metrics"]["periods"]*2π/P.f_ω0
+
+    return m
+end
+
+function update_metrics!(m::Dict, iter::Int64,
                         P::CSC.Params, F::CSC.Flags, config,
                         coords::Cortex.PointCoords,
                         coords_s::Cortex.PointCoordsShifted,
@@ -79,14 +89,23 @@ function update_metrics(m::Dict, iter::Int64,
     end
 end
 
-function close_metrics(m::Dict, iter::Int64, P::CSC.Params)
-    m["t_end"] = iter*P.δt
-    m["max_y_end"] = m["inst_max_y"][end]
-    m["average_velocity"] = (m["max_y_end"] - m["max_y_start"])/(m["t_end"] - m["t_start"])
+function close_metrics!(m::Dict, iter::Int64, t::Float64, P::CSC.Params)
+    if m["started"]
+        m["iter_end"] = iter
+        m["t_end"] = t
+        m["max_y_end"] = m["inst_max_y"][end]
+        m["average_velocity"] = (m["max_y_end"] - m["max_y_start"])/(m["t_end"] - m["t_start"])
+    end
 end
 
 function save_metrics(m::Dict, prefix::String)
     f = open(string(prefix, "_metrics.yaml"), "w")
+    write(f, string("started: ", m["started"], "\n"))
+    write(f, string("finished: ", m["finished"], "\n"))
+    if !m["finished"]
+        close(f)
+        return
+    end
     for k in ["iter_start", "max_y_start", "t_start", "target_max_y", "max_y_end", "t_end", "average_velocity"]
         write(f, string(k, ": ", m[k], "\n"))
     end
