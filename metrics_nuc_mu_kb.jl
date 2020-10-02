@@ -51,6 +51,7 @@ kbs = 10 .^range(log10.(0.0204), log10.(0.035); length=4)
 param_range = Base.Iterators.product(kbs, mus)
 # param_range = Base.Iterators.drop(param_range, 72)
 
+catch_errors = false
 
 # Loop
 for (kb, mu) in param_range
@@ -65,10 +66,14 @@ for (kb, mu) in param_range
     write(param_log, string(date, "\t", mu, "\t", kb, "\n"))
 
     # Run the simulation
-    try
+    if !catch_errors
         CellSim.launch(P, F, config; force_date_string=date)
-    catch
-        println("error")
+    else
+        try
+            CellSim.launch(P, F, config; force_date_string=date)
+        catch
+            println("error")
+        end
     end
 end
 

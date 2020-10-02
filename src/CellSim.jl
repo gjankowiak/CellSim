@@ -290,7 +290,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
             1e-6, # minimum time step
             1.4,  # stepping factor
             1e-4,  # step up error
-            1e-2  # step down error
+            8e-4  # step down error
     )
 
     Cortex.init_FD_matrices(P)
@@ -481,7 +481,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
         end
 
 
-        # try
+        try
         # inner loop
         if k > 1
             Cortex.update_coords(coords, P, x)
@@ -570,7 +570,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
         end
 
         if metrics["started"]
-            Metrics.update_metrics(metrics, k, current_time, P, F, config, coords, coords_s, old_coords, nucleus_coords)
+            Metrics.update_metrics!(metrics, k, P, F, config, coords, coords_s, old_coords, nucleus_coords)
         end
 
         if F.cortex
@@ -579,12 +579,12 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
         if F.nucleus
             Nucleus.copy(old_nucleus_coords, nucleus_coords)
         end
-        # catch e
-            # println()
-            # println("ERROR at iteration ", k, ":")
-            # println(e)
-            # break
-        # end
+        catch e
+            println()
+            println("ERROR at iteration ", k, ":")
+            println(e)
+            break
+        end
 
         # plot
         if (F.plot && ((k % plot_period == 0) || stepping))
@@ -602,7 +602,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
     end
 
     if F.write_metrics
-        Metrics.close_metrics(metrics, k, P)
+        Metrics.close_metrics!(metrics, k, current_time, P)
         Metrics.save_metrics(metrics, "$(config["output_prefix"])Run_$(config["date_string"])")
     end
 
