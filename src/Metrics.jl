@@ -15,6 +15,7 @@ function init_metrics(P::CSC.Params, F::CSC.Flags, config)
 
     m["started"] = false
     m["finished"] = false
+    m["crashed"] = false
 
     m["inst_max_y"] = Vector{Float64}()
     m["inst_velocity"] = Vector{Float64}()
@@ -102,6 +103,7 @@ function save_metrics(m::Dict, prefix::String)
     f = open(string(prefix, "_metrics.yaml"), "w")
     write(f, string("started: ", m["started"], "\n"))
     write(f, string("finished: ", m["finished"], "\n"))
+    write(f, string("crashed: ", m["crashed"], "\n"))
     if !m["finished"]
         close(f)
         return

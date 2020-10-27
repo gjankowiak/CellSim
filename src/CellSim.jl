@@ -580,6 +580,9 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
             Nucleus.copy(old_nucleus_coords, nucleus_coords)
         end
         catch e
+            if F.write_metrics
+                metrics["crashed"] = true
+            end
             println()
             println("ERROR at iteration ", k, ":")
             println(e)

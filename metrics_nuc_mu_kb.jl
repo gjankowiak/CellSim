@@ -8,7 +8,7 @@ import Dates
 base_config = "configs_metrics/nucleus/varia_mu.yaml"
 
 # The output prefix, this overrides the one set in the configuration file
-output_prefix = "nuc_mu_kb_fine_1"
+output_prefix = "nuc_mu_kb_fine_1_test"
 
 # Load configuration
 P, F, config = CellSim.read_config(base_config)
@@ -41,8 +41,8 @@ mus = collect(range(1, stop=50, length=15))[11]
 kbs = 10 .^range(log10.(5e-4), log10.(0.5); length=15)[10]
 
 # fine 1
-mus = collect(range(23.6, stop=34, length=8))
-kbs = 10 .^range(log10.(0.0204), log10.(0.035); length=4)
+mus = collect(range(23.6, stop=34, length=8))[1:1]
+kbs = 10 .^range(log10.(0.0204), log10.(0.035); length=4)[1:1]
 
 # fine 2
 # mus = collect(range(34.3, stop=50, length=6))
