@@ -133,6 +133,10 @@ mutable struct Flags
     debug::Bool
 end
 
+function copy(x::Params)
+    Params([getfield(x, k) for k in fieldnames(Params)]...)
+end
+
 function to_dict(s::Union{Params,Flags})
     return Dict([(String(field), getfield(s, field)) for field in fieldnames(typeof(s))])
 end

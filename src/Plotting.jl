@@ -24,7 +24,9 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
 
     fig = PyPlot.figure(figsize=(12.8, 10), dpi=50)
 
-    PyPlot.show()
+    if PyPlot.matplotlib.backends.backend != "agg"
+        PyPlot.show()
+    end
     # figManager = PyPlot.get_current_fig_manager()
     # figManager.window.showMaximized()
 
@@ -129,7 +131,7 @@ function init_plot(coords::Cortex.PointCoords, P::CellSimCommon.Params, F::CellS
     return fig
 end
 
-function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.NucleusCoords,Missing}, k::Int, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::CellSimCommon.Plotables,
+function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.NucleusCoords,Missing}, iter::Int64, time::Real, P::CellSimCommon.Params, F::CellSimCommon.Flags, initializing::Bool, plotables::CellSimCommon.Plotables,
                      vr::Union{Centrosome.VisibleRegion,Missing})
 
     x = coords.x
@@ -140,7 +142,7 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
     else
         prefix = ""
     end
-    ax.set_title(Printf.@sprintf("%s N: %d, iter: %d, T=%fs", prefix, P.N, k, k*P.δt))
+    ax.set_title(Printf.@sprintf("%s N: %d, iter: %d, T=%fs", prefix, P.N, iter, time))
 
     lines = ax.lines
     scatters = ax.collections
@@ -305,7 +307,9 @@ function plot_metrics(m::Dict)
         PyPlot.plot(m["inst_bc2cs_distance"], label="Cortex barycenter to centrosome")
     end
     PyPlot.legend()
-    PyPlot.show()
+    if PyPlot.matplotlib.backends.backend != "agg"
+        PyPlot.show()
+    end
 end
 
 function close()

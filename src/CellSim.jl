@@ -17,6 +17,8 @@ import Centrosome
 import LinearAlgebra
 const LA = LinearAlgebra
 
+import Distributed
+
 import JankoUtils
 import EvenParam
 
@@ -252,7 +254,11 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
         println("*** debug MODE ***")
     end
 
-    run(`stty -icanon`)
+    distr = (Distributed.nprocs() > 1)
+
+    if !distr
+        run(`stty -icanon`)
+    end
 
     plotables = CSC.new_plotables(P.N)
 
@@ -392,7 +398,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
 
     stepping = F.debug
     breakpoint = -1
-    if !stepping
+    if !stepping && !distr
         input_task = @async read(stdin, Char)
     end
 
@@ -402,9 +408,10 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
     while k < P.M
         max_y = maximum(coords.x[:,2])
         if metrics["started"] && (max_y >= metrics["target_max_y"])
-                println()
-                print("Target number of periods reached, finishing...")
-                println()
+            metrics["finished"] = true
+            println()
+            print("Target number of periods reached, finishing...")
+            println()
             break
         end
 
@@ -412,27 +419,29 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
             stepping = true
         end
 
-        if stepping
-            println("debug: 'q' to quit, 'c' to run continuously, 'C' to continue to ITER, any other key to step, 'b' to run step by step")
-            key = read(stdin, 1)[1]
-            if key == 0x63 # c
-                stepping = false
+        if !distr
+            if stepping
+                println("debug: 'q' to quit, 'c' to run continuously, 'C' to continue to ITER, any other key to step, 'b' to run step by step")
+                key = read(stdin, 1)[1]
+                if key == 0x63 # c
+                    stepping = false
+                    input_task = @async read(stdin, Char)
+                elseif key == 0x43 # C
+                    stepping = false
+                    breakpoint = parse(Int, readline())
+                    input_task = @async read(stdin, Char)
+                elseif key == 0x71 # q
+                    break
+                end
+            elseif istaskdone(input_task)
+                key = fetch(input_task)
+                if key == 'b'
+                    stepping = true
+                elseif key == 'q'
+                    break
+                end
                 input_task = @async read(stdin, Char)
-            elseif key == 0x43 # C
-                stepping = false
-                breakpoint = parse(Int, readline())
-                input_task = @async read(stdin, Char)
-            elseif key == 0x71 # q
-                break
             end
-        elseif istaskdone(input_task)
-            key = fetch(input_task)
-            if key == 'b'
-                stepping = true
-            elseif key == 'q'
-                break
-            end
-            input_task = @async read(stdin, Char)
         end
 
         k += 1
@@ -473,9 +482,9 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
                     println()
                     print("Starting collecting metrics, stopping when head reaches y=", metrics["target_max_y"], " (+", config["metrics"]["periods"], ")")
                     println()
-                elseif k == P.M/4 # wait for max 20k iteration if P.M = 80k
+                elseif current_time > 3 # wait for max 20k iteration if P.M = 80k
                     println()
-                    println("Initialization not finished after " * string(round(Int, P.M/4)) * " iterations, aborting this run")
+                    println("Initialization not finished after " * string(current_time) * " time units, aborting this run")
                     break
                 end
         end
@@ -530,7 +539,6 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
             end
 
             max_displacement = maximum(abs.(x - x_candidate))
-            @show max_displacement
 
             accept = true
 
@@ -539,18 +547,18 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
                     accept = true
                 else
                     P.δt = min(solver_params.max_δt, P.δt * solver_params.stepping_factor)
-                    println()
-                    println("Time step ↑ $(P.δt)")
-                    println()
+                    # println()
+                    # println("Time step ↑ $(P.δt)")
+                    # println()
                     decreasing_step = false
                     accept = false
                 end
             elseif max_displacement > solver_params.step_down_error # too large
                 P.δt = P.δt / solver_params.stepping_factor
                 decreasing_step = true
-                println()
-                println("Time step ↓ $(P.δt)")
-                println()
+                # println()
+                # println("Time step ↓ $(P.δt)")
+                # println()
                 if P.δt < solver_params.min_δt
                     throw("Time step became too small")
                 end
