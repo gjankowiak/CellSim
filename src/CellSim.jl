@@ -380,7 +380,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
         end
         plot_period = F.debug ? 1 : 10
         fig = Plotting.init_plot(coords, P, F)
-        Plotting.update_plot(coords, nucleus_coords, 0, P, F, false, plotables, centro_vr)
+        Plotting.update_plot(coords, nucleus_coords, 0, 0.0, P, F, false, plotables, centro_vr)
         if F.write_animation
             writer = Plotting.init_animation(config["output_prefix"], config["date_string"])
             writer.setup(fig, string(writer.metadata["title"], ".mp4"), 100)
@@ -460,7 +460,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
         #   Once one of previous condition is met, we then wait for the cell to cross
         #   "post_init_periods" after which we start recording metrics for "periods" periods.
         #
-        if F.write_metrics && !metrics["started"]
+        if !metrics["started"]
                 if !metrics_pre_init_done
                     if config["metrics"]["start_iteration"] > 0
                         if k == config["metrics"]["start_iteration"]
@@ -588,9 +588,8 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
             Nucleus.copy(old_nucleus_coords, nucleus_coords)
         end
         catch e
-            if F.write_metrics
-                metrics["crashed"] = true
-            end
+            metrics["crashed"] = true
+
             println()
             println("ERROR at iteration ", k, ":")
             println(e)
@@ -599,7 +598,7 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
 
         # plot
         if (F.plot && ((k % plot_period == 0) || stepping))
-            Plotting.update_plot(coords, nucleus_coords, k, P, F, false, plotables, centro_vr)
+            Plotting.update_plot(coords, nucleus_coords, k, current_time, P, F, false, plotables, centro_vr)
             if F.write_animation
                 writer.grab_frame()
             end
@@ -608,29 +607,27 @@ function launch(P::CSC.Params, F::CSC.Flags, config; force_date_string::String="
             prev_height = height
         end
 
-        writedlm("$(config["output_prefix"])Run_$(config["date_string"])_last_x.csv", coords.x, ',')
-        writedlm("$(config["output_prefix"])Run_$(config["date_string"])_last_centro_x.csv", coords.centro_x, ',')
+        # writedlm("$(config["output_prefix"])Run_$(config["date_string"])_last_x.csv", coords.x, ',')
+        # writedlm("$(config["output_prefix"])Run_$(config["date_string"])_last_centro_x.csv", coords.centro_x, ',')
     end
 
-    if F.write_metrics
-        Metrics.close_metrics!(metrics, k, current_time, P)
-        Metrics.save_metrics(metrics, "$(config["output_prefix"])Run_$(config["date_string"])")
-    end
+    Metrics.close_metrics!(metrics, k, current_time, P)
+    Metrics.save_metrics(metrics, "$(config["output_prefix"])Run_$(config["date_string"])")
 
     if F.write_animation && F.plot
         writer.finish()
     end
     println("Finished")
 
-    if F.plot && metrics["started"]
-        Plotting.plot_metrics(metrics)
-    end
+    # if F.plot && metrics["started"]
+        # Plotting.plot_metrics(metrics)
+    # end
 
     if get(config, "batch", false)
         Plotting.close()
     end
 
-    return
+    return metrics
 end
 
 end # module

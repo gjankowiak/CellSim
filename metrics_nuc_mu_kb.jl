@@ -1,3 +1,5 @@
+using Distributed
+
 @everywhere push!(LOAD_PATH, "src")
 
 @everywhere import Pkg
@@ -6,7 +8,7 @@
 @everywhere import CellSim
 @everywhere import CellSimCommon
 
-import Dates
+@everywhere import Dates
 
 function trigrid(xmin::Real, xmax::Real, nx::Int64,
                  ymin::Real, ymax::Real, ny::Int64, as_tuples=true)
@@ -51,7 +53,7 @@ end
 base_config = "configs_metrics/nucleus/varia_mu.yaml"
 
 # The output prefix, this overrides the one set in the configuration file
-output_prefix = "/scratch/scratch/jankowiak/cellsim_results/nuc_mu_kb_fine_1-9/"
+output_prefix = "/scratch/scratch/jankowiak/cellsim_results/nuc_mu_kb_fine_1-1/"
 
 # Load configuration
 P_global, F_global, config_global = CellSim.read_config(base_config)
@@ -80,11 +82,11 @@ kbs = 10 .^range(log10.(5e-4), log10.(0.5); length=30)
 
 mu_min = 1
 mu_max = 50
-mu_n = 10
+mu_n = 30
 
 kb_min = 5e-4
 kb_max = 0.5
-kb_n = 10
+kb_n = 30
 
 param_range = trigrid(mu_min, mu_max, mu_n,
             log10.(kb_min), log10.(kb_max), kb_n)
@@ -96,35 +98,60 @@ param_range = [(p[1], 10 .^p[2]) for p in param_range]
 catch_errors = true
 
 # Loop
-@sync @distributed for (mu, kb) in param_range
+@everywhere function mukb_to_velocity(t::Tuple{Real,Real})
+    (mu, kb) = t
     println("kb: ", kb, ", mu: ", mu)
 
-    P = CellSimCommon.copy(P_global)
+    P = CellSimCommon.copy($P_global)
+    config = deepcopy($config_global)
 
     # Set the parameter value
     P.N_mu = mu
     P.N_kb = kb
 
     # Write the current value to the log file
-    date = string(Dates.now())
+    date = string(Dates.now(), "-", myid())
     # write(param_log, string(date, "\t", mu, "\t", kb, "\n"))
 
     # Run the simulation
-    if !catch_errors
-        CellSim.launch(P, F_global, config_global; force_date_string=date)
-    else
-        try
-            CellSim.launch(P, F_global, config_global; force_date_string=date)
-        catch e
-            println("error")
-            fn = "$(output_prefix)Run_$(date)_error.txt"
-            println(fn)
-            f = open(fn, "w")
-            f.write(string(e))
-            f.write("\n")
-            close(f)
-        end
+    got_error = false
+    try
+        metrics = CellSim.launch(P, $F_global, config; force_date_string=date)
+        # println(P)
+        # println($F_global)
+        # println(config)
+        # println(date)
+        # metrics = Dict([("average_velocity", 0.5), ("status","finished")])
+        return (mu=mu, kb=kb, metrics=metrics, date=date)
+    catch e
+        println("error")
+        got_error = true
+        fn = "$(config["output_prefix"])Run_$(date)_error.txt"
+        f = open(fn, "w")
+        write(f, string(e))
+        write(f, "\n")
+        close(f)
+        return (mu=mu, kb=kb, metrics=nothing, date=date)
     end
 end
+
+results = pmap(mukb_to_velocity, param_range)
+
+parameter_log_file = string(output_prefix, "/parameter_log.txt")
+f = open(parameter_log_file, "w")
+for l in results
+    if !isnothing(l.metrics)
+        av = get(l.metrics, "average_velocity", -1)
+        status = l.metrics["status"]
+    else
+        av = -2
+        status = "error"
+    end
+    write(f, string(l.date, ", ", l.mu, ", ", l.kb, ", ", av, ", ", status, "\n"))
+end
+close(f)
+
+println(parameter_log_file)
+
 
 # close(param_log)

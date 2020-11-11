@@ -1,6 +1,6 @@
 params:
     N: 250 # number of points
-    M: 80000 # max. number of iterations
+    M: 180000 # max. number of iterations
 
     δt: 2e-4 # time step
 
@@ -80,7 +80,7 @@ config:
 
     plot_period: 20
 
-    recompute_nucleus_each: 5
+    recompute_nucleus_each: 50
 
     metrics:
         start_iteration: 1

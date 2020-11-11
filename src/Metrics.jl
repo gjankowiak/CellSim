@@ -91,11 +91,22 @@ function update_metrics!(m::Dict, iter::Int64,
 end
 
 function close_metrics!(m::Dict, iter::Int64, t::Float64, P::CSC.Params)
-    if m["started"]
+    m["status"] = "not_started"
+    if m["finished"]
+        m["status"] = "finished"
         m["iter_end"] = iter
         m["t_end"] = t
         m["max_y_end"] = m["inst_max_y"][end]
         m["average_velocity"] = (m["max_y_end"] - m["max_y_start"])/(m["t_end"] - m["t_start"])
+    else
+        if m["started"]
+            m["status"] = "started"
+            m["average_velocity"] = 0
+        end
+        if m["crashed"]
+            m["status"] = "crashed"
+            m["average_velocity"] = -1
+        end
     end
 end
 
