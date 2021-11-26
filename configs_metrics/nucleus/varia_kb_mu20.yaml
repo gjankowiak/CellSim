@@ -1,6 +1,6 @@
 params:
     N: 250 # number of points
-    M: 15000 # max. number of iterations
+    M: 180000 # max. number of iterations
 
     δt: 2e-4 # time step
 
@@ -65,12 +65,12 @@ flags:
     weighted_confinement: true
     write_animation:      true
     landscape_plot:       false
-    plot_drag:            true
+    plot_drag:            false
     circular_wall:        false
     cortex:               true
     centrosome:           true
     nucleus:              true
-    follow_cam:           false
+    follow_cam:           true
     debug:                false
     force_cortex_area:    true
     write_metrics:        true
@@ -79,6 +79,8 @@ config:
     output_prefix: test_ultimaGaspard7bis
 
     plot_period: 20
+
+    recompute_nucleus_each: 50
 
     metrics:
         start_iteration: 1

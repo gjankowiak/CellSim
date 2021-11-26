@@ -1,13 +1,13 @@
 params:
     N: 250 # number of points
-    M: 80000 # max. number of iterations
+    M: 180000 # max. number of iterations
 
     δt: 2e-4 # time step
 
     P: 4*6.15e-1 # pressure
     K: 3e-1 # membrane elasticity
     Ka: 1 # cortex viscosity
-    mu: 50 # area constraint relaxation constant
+    mu: 10 # area constraint relaxation constant
     target_area: 1.8 # cortex target area
 
     c: 1e1 # polymerization speed
@@ -64,12 +64,12 @@ flags:
     weighted_confinement: true
     write_animation:      true
     landscape_plot:       false
-    plot_drag:            true
+    plot_drag:            false
     circular_wall:        false
     cortex:               true
     centrosome:           true
     nucleus:              true
-    follow_cam:           false
+    follow_cam:           true
     debug:                false
     force_cortex_area:    true
     write_metrics:        true
@@ -78,6 +78,8 @@ config:
     output_prefix: test_width1_mu100_variakb1em2
 
     plot_period: 20
+
+    recompute_nucleus_each: 50
 
     metrics:
         start_iteration: 1
