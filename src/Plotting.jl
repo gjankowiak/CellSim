@@ -212,8 +212,8 @@ function update_plot(coords::Cortex.PointCoords, nucleus_coords::Union{Nucleus.N
         idx_p += 1
 
         ## Center
-        artists[idx_a].center = (coords.centro_x[1], coords.centro_x[2])
-        idx_a += 1
+        # artists[idx_a].center = (coords.centro_x[1], coords.centro_x[2])
+        # idx_a += 1
 
         ## Microtubule force
         # scatters[idx_s].set_offsets(coords.centro_x) # centrosome
