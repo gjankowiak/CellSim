@@ -32,7 +32,7 @@ and add some unregistered dependencies:
 - At this point you should be able to run the code with
 
 ```
-    $ julia --project run.jl configs_metrics/no_nucleus/varia_mu.yaml
+    $ julia --project=. run.jl configs_metrics/no_nucleus/varia_mu.yaml
 ```
 It can take a really long time (30 seconds or more) to start because of the initial loading required.
 
