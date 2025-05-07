@@ -24,10 +24,10 @@ $ git clone https://github.com/gjankowiak/CellSim
 ```
     pkg> activate .
 ```
-and
+and add some unregistered dependencies:
 
 ```
-    (CellSim) pkg> instantiate
+    (CellSim) pkg> add https://github.com/gjankowiak/JankoUtils.jl https://github.com/gjankowiak/EvenParam.jl https://github.com/gjankowiak/Visibility.jl
 ```
 - At this point you should be able to run the code with
 
